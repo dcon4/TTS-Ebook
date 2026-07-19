@@ -86,6 +86,7 @@ class TtsPlaybackService : Service() {
         private set
 
     private var hasPendingChunks = false
+    private var ttsInitPending = false
 
     override fun onCreate() {
         super.onCreate()
@@ -111,18 +112,24 @@ class TtsPlaybackService : Service() {
             ACTION_PLAY -> {
                 val bookIdExtra = intent.getStringExtra("bookId")
                 if (bookIdExtra != null && bookIdExtra != bookId) {
-                    kotlinx.coroutines.GlobalScope.launch {
-                        val entity = bookRepository.getBook(bookIdExtra) ?: return@launch
-                        val bookEbook = bookRepository.loadBook(entity.filePath) ?: return@launch
-                        chapters = bookEbook.chapters
-                        this@TtsPlaybackService.bookId = bookEbook.id
-                        this@TtsPlaybackService.bookTitle = bookEbook.title
-                        this@TtsPlaybackService.currentChapterIndex = intent.getIntExtra("startChapter", 0)
-                            .coerceIn(0, chapters.lastIndex.coerceAtLeast(0))
-                        loadChapterParagraphs()
-                        this@TtsPlaybackService.currentParagraphIndex = intent.getIntExtra("startParagraph", 0)
-                            .coerceIn(0, paragraphs.lastIndex.coerceAtLeast(0))
-                        resume()
+                    kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.CoroutineExceptionHandler { _, e ->
+                        DebugLogger.logException(TAG, "Play coroutine failed", e)
+                    }) {
+                        try {
+                            val entity = bookRepository.getBook(bookIdExtra) ?: return@launch
+                            val bookEbook = bookRepository.loadBook(entity.filePath) ?: return@launch
+                            chapters = bookEbook.chapters
+                            this@TtsPlaybackService.bookId = bookEbook.id
+                            this@TtsPlaybackService.bookTitle = bookEbook.title
+                            this@TtsPlaybackService.currentChapterIndex = intent.getIntExtra("startChapter", 0)
+                                .coerceIn(0, chapters.lastIndex.coerceAtLeast(0))
+                            loadChapterParagraphs()
+                            this@TtsPlaybackService.currentParagraphIndex = intent.getIntExtra("startParagraph", 0)
+                                .coerceIn(0, paragraphs.lastIndex.coerceAtLeast(0))
+                            resume()
+                        } catch (e: Exception) {
+                            DebugLogger.logException(TAG, "Play action failed", e)
+                        }
                     }
                 } else {
                     resume()
@@ -179,11 +186,13 @@ class TtsPlaybackService : Service() {
         if (paragraphs.isEmpty() || currentParagraphIndex >= paragraphs.size) return
         requestAudioFocus()
         isPlaying = true
-        if (!ttsManager.ttsReady) {
+        if (!ttsManager.ttsReady && !ttsInitPending) {
+            ttsInitPending = true
             ttsManager.initTts { success ->
+                ttsInitPending = false
                 if (success) speakCurrent() else isPlaying = false
             }
-        } else {
+        } else if (ttsManager.ttsReady) {
             speakCurrent()
         }
         broadcastPosition()
@@ -467,7 +476,11 @@ class TtsPlaybackService : Service() {
             .addAction(android.R.drawable.ic_menu_add, "Bookmark", bookmarkPending)
             .build()
 
-        startForeground(NOTIFICATION_ID, notification)
+        try {
+            startForeground(NOTIFICATION_ID, notification)
+        } catch (e: Exception) {
+            DebugLogger.log(TAG, "startForeground failed: ${e.message}")
+        }
     }
 
     private fun updateMediaSession() {

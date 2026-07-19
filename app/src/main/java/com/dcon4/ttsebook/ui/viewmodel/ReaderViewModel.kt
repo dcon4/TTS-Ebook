@@ -1,10 +1,14 @@
 package com.dcon4.ttsebook.ui.viewmodel
 
+import android.Manifest
 import android.app.Application
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.dcon4.ttsebook.data.BookEntity
@@ -83,26 +87,36 @@ class ReaderViewModel @Inject constructor(
     fun loadBook(bookId: String, initialChapterIndex: Int = -1, initialParagraphIndex: Int = -1) {
         registerPositionReceiver()
         viewModelScope.launch {
-            val entity = bookRepository.getBook(bookId) ?: return@launch
-            bookEntity = entity
-            val ebook = bookRepository.loadBook(entity.filePath) ?: return@launch
-            _currentBook.value = ebook
-            if (initialChapterIndex >= 0 && initialParagraphIndex >= 0) {
-                _currentChapterIndex.value = initialChapterIndex
-                _currentParagraphIndex.value = initialParagraphIndex
-            } else {
-                val pos = bookRepository.getPosition(bookId)
-                _currentChapterIndex.value = pos?.chapterIndex ?: 0
-                _currentParagraphIndex.value = pos?.paragraphIndex ?: 0
+            try {
+                val entity = bookRepository.getBook(bookId) ?: return@launch
+                bookEntity = entity
+                val ebook = bookRepository.loadBook(entity.filePath) ?: return@launch
+                _currentBook.value = ebook
+                if (initialChapterIndex >= 0 && initialParagraphIndex >= 0) {
+                    _currentChapterIndex.value = initialChapterIndex
+                    _currentParagraphIndex.value = initialParagraphIndex
+                } else {
+                    val pos = bookRepository.getPosition(bookId)
+                    _currentChapterIndex.value = pos?.chapterIndex ?: 0
+                    _currentParagraphIndex.value = pos?.paragraphIndex ?: 0
+                }
+                val intent = Intent(getApplication(), TtsPlaybackService::class.java).apply {
+                    action = TtsPlaybackService.ACTION_PLAY
+                    putExtra("bookId", ebook.id)
+                    putExtra("bookTitle", ebook.title)
+                    putExtra("startChapter", _currentChapterIndex.value)
+                    putExtra("startParagraph", _currentParagraphIndex.value)
+                }
+                val canUseForeground = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                    ContextCompat.checkSelfPermission(getApplication(), Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                if (canUseForeground) {
+                    getApplication<Application>().startForegroundService(intent)
+                } else {
+                    getApplication<Application>().startService(intent)
+                }
+            } catch (e: Exception) {
+                DebugLogger.logException(TAG, "loadBook failed", e)
             }
-            val intent = Intent(getApplication(), TtsPlaybackService::class.java).apply {
-                action = TtsPlaybackService.ACTION_PLAY
-                putExtra("bookId", ebook.id)
-                putExtra("bookTitle", ebook.title)
-                putExtra("startChapter", _currentChapterIndex.value)
-                putExtra("startParagraph", _currentParagraphIndex.value)
-            }
-            getApplication<Application>().startForegroundService(intent)
         }
     }
 
