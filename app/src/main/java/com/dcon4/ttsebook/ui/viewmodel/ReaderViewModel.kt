@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.content.Context
 import android.os.Build
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
@@ -92,10 +93,18 @@ class ReaderViewModel @Inject constructor(
 
     private fun registerPositionReceiver() {
         if (!receiverRegistered) {
-            getApplication<Application>().registerReceiver(
-                positionReceiver,
-                IntentFilter(TtsPlaybackService.ACTION_POSITION_CHANGED)
-            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                getApplication<Application>().registerReceiver(
+                    positionReceiver,
+                    IntentFilter(TtsPlaybackService.ACTION_POSITION_CHANGED),
+                    Context.RECEIVER_NOT_EXPORTED
+                )
+            } else {
+                getApplication<Application>().registerReceiver(
+                    positionReceiver,
+                    IntentFilter(TtsPlaybackService.ACTION_POSITION_CHANGED)
+                )
+            }
             receiverRegistered = true
         }
     }
