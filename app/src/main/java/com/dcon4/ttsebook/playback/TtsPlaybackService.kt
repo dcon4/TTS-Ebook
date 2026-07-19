@@ -18,6 +18,7 @@ import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.core.app.NotificationCompat
+import androidx.media.app.NotificationCompat as MediaNotificationCompat
 import com.dcon4.ttsebook.MainActivity
 import com.dcon4.ttsebook.R
 import com.dcon4.ttsebook.data.EbookChapter
@@ -419,7 +420,7 @@ class TtsPlaybackService : Service() {
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
             .setStyle(
-                NotificationCompat.MediaStyle()
+                MediaNotificationCompat.MediaStyle()
                     .setMediaSession(mediaSession.sessionToken)
                     .setShowActionsInCompactView(0, 1, 2, 3, 4)
             )
