@@ -111,14 +111,29 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun loadBook(bookId: String, initialChapterIndex: Int = -1, initialParagraphIndex: Int = -1) {
-        registerPositionReceiver()
         viewModelScope.launch {
+            DebugLogger.log(TAG, "loadBook: start bookId=$bookId")
+            val t0 = System.currentTimeMillis()
             try {
-                val entity = bookRepository.getBook(bookId) ?: return@launch
+                val entity = bookRepository.getBook(bookId) ?: run {
+                    DebugLogger.log(TAG, "loadBook: getBook returned null"); return@launch
+                }
                 bookEntity = entity
+                val t1 = System.currentTimeMillis()
+                DebugLogger.log(TAG, "loadBook: getBook ${t1-t0}ms")
+                registerPositionReceiver()
+                val t2 = System.currentTimeMillis()
+                DebugLogger.log(TAG, "loadBook: registerReceiver ${t2-t1}ms")
+                bookEntity = entity
+                val t3 = System.currentTimeMillis()
+                DebugLogger.log(TAG, "loadBook: getBook ${t3-t2}ms")
                 val ebook = withContext(Dispatchers.IO) {
                     bookRepository.loadBook(entity.filePath)
-                } ?: return@launch
+                } ?: run {
+                    DebugLogger.log(TAG, "loadBook: loadBook returned null"); return@launch
+                }
+                val t4 = System.currentTimeMillis()
+                DebugLogger.log(TAG, "loadBook: loadBook ${t4-t3}ms chapters=${ebook.chapters.size}")
                 _currentBook.value = ebook
                 if (initialChapterIndex >= 0 && initialParagraphIndex >= 0) {
                     _currentChapterIndex.value = initialChapterIndex
@@ -131,6 +146,8 @@ class ReaderViewModel @Inject constructor(
                 val list = withContext(Dispatchers.Default) {
                     computeParagraphs(ebook, _currentChapterIndex.value)
                 }
+                val t5 = System.currentTimeMillis()
+                DebugLogger.log(TAG, "loadBook: computeParagraphs ${t5-t4}ms size=${list.size}")
                 _paragraphs.value = list
                 _paragraphCount.value = list.size
                 val intent = Intent(getApplication(), TtsPlaybackService::class.java).apply {
@@ -142,6 +159,8 @@ class ReaderViewModel @Inject constructor(
                 }
                 val canUseForeground = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
                     ContextCompat.checkSelfPermission(getApplication(), Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                val t6 = System.currentTimeMillis()
+                DebugLogger.log(TAG, "loadBook: service start ${t6-t0}ms total")
                 if (canUseForeground) {
                     getApplication<Application>().startForegroundService(intent)
                 } else {
