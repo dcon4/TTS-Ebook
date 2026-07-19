@@ -90,6 +90,9 @@ fun TtsEbookNavHost() {
                     navController.navigate("search/$bookId")
                 },
                 onNavigateToBookmarks = { },
+                onNavigateToSettings = {
+                    navController.navigate("settings")
+                },
                 onBack = { navController.popBackStack() }
             )
         }
@@ -129,6 +132,9 @@ fun TtsEbookNavHost() {
                     navController.navigate("search/$bookId")
                 },
                 onNavigateToBookmarks = { },
+                onNavigateToSettings = {
+                    navController.navigate("settings")
+                },
                 onBack = { navController.popBackStack() }
             )
         }

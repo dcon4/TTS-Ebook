@@ -173,7 +173,13 @@ class TtsPlaybackService : Service() {
         if (paragraphs.isEmpty() || currentParagraphIndex >= paragraphs.size) return
         requestAudioFocus()
         isPlaying = true
-        speakCurrent()
+        if (!ttsManager.ttsReady) {
+            ttsManager.initTts { success ->
+                if (success) speakCurrent() else isPlaying = false
+            }
+        } else {
+            speakCurrent()
+        }
         updateNotification()
         updateMediaSession()
     }

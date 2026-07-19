@@ -34,6 +34,7 @@ fun ReaderScreen(
     initialParagraphIndex: Int = -1,
     onNavigateToSearch: () -> Unit,
     onNavigateToBookmarks: () -> Unit,
+    onNavigateToSettings: () -> Unit,
     onBack: () -> Unit,
     viewModel: ReaderViewModel = hiltViewModel()
 ) {
@@ -78,6 +79,12 @@ fun ReaderScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = onNavigateToSettings,
+                        modifier = Modifier.semantics { contentDescription = "Settings" }
+                    ) {
+                        Icon(Icons.Default.Settings, contentDescription = null)
+                    }
                     IconButton(
                         onClick = { showDebugDialog = true },
                         modifier = Modifier.semantics { contentDescription = "Share debug log" }
