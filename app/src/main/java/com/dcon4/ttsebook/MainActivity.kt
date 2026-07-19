@@ -72,6 +72,9 @@ fun TtsEbookNavHost() {
                 onBookSelected = { bookId ->
                     selectedBookId = bookId
                     navController.navigate("reader/$bookId")
+                },
+                onNavigateToSettings = {
+                    navController.navigate("settings")
                 }
             )
         }

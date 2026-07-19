@@ -29,7 +29,7 @@ fun SettingsScreen(
     val selectedEngine by viewModel.selectedEngine.collectAsState()
     val selectedVoice by viewModel.selectedVoice.collectAsState()
     val speechRate by viewModel.speechRate.collectAsState()
-    val fontSize by viewModel.fontSize.collectAsState()
+    val verboseEnabled by viewModel.verboseEnabled.collectAsState()
 
     var showDebugDialog by remember { mutableStateOf(false) }
     var showEngineDialog by remember { mutableStateOf(false) }
@@ -118,33 +118,35 @@ fun SettingsScreen(
 
             item {
                 Spacer(Modifier.height(16.dp))
-                Text("Display Settings", style = MaterialTheme.typography.titleMedium)
+                Text("Debug", style = MaterialTheme.typography.titleMedium)
             }
 
             item {
                 OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Font Size", style = MaterialTheme.typography.labelLarge)
-                        Slider(
-                            value = fontSize.toFloat(),
-                            onValueChange = { viewModel.setFontSize(it.toInt()) },
-                            valueRange = 12f..32f,
-                            steps = 19,
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Verbose Logging", style = MaterialTheme.typography.labelLarge)
+                            Text(
+                                text = if (verboseEnabled) "Enabled" else "Disabled",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = verboseEnabled,
+                            onCheckedChange = { viewModel.toggleVerboseLogging() },
                             modifier = Modifier.semantics {
-                                contentDescription = "Font size: $fontSize"
+                                contentDescription = "Toggle verbose logging"
                             }
-                        )
-                        Text(
-                            text = "$fontSize sp",
-                            style = MaterialTheme.typography.bodySmall
                         )
                     }
                 }
-            }
-
-            item {
-                Spacer(Modifier.height(16.dp))
-                Text("Debug", style = MaterialTheme.typography.titleMedium)
             }
 
             item {

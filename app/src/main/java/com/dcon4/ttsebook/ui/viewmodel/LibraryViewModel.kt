@@ -13,9 +13,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+enum class SortMode { RECENT, TITLE, AUTHOR, FORMAT }
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
@@ -23,14 +26,36 @@ class LibraryViewModel @Inject constructor(
     private val bookRepository: BookRepository
 ) : AndroidViewModel(application) {
 
-    val books: StateFlow<List<BookEntity>> = bookRepository.getAllBooks()
+    private val allBooksFlow = bookRepository.getAllBooks()
+    private val recentBooksFlow = bookRepository.getRecentBooks(5)
+
+    private val _sortMode = MutableStateFlow(SortMode.RECENT)
+    val sortMode: StateFlow<SortMode> = _sortMode.asStateFlow()
+
+    val recentBooks: StateFlow<List<BookEntity>> = recentBooksFlow
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val books: StateFlow<List<BookEntity>> = combine(allBooksFlow, _sortMode) { books, sort ->
+        when (sort) {
+            SortMode.RECENT -> books.sortedByDescending { it.lastOpenedAt }
+            SortMode.TITLE -> books.sortedBy { it.title.lowercase() }
+            SortMode.AUTHOR -> books.sortedBy { it.author.lowercase() }
+            SortMode.FORMAT -> books.sortedBy { it.format }
+        }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     private val _importResult = MutableStateFlow<Result<EbookBook>?>(null)
     val importResult: StateFlow<Result<EbookBook>?> = _importResult.asStateFlow()
 
     private val _isImporting = MutableStateFlow(false)
     val isImporting: StateFlow<Boolean> = _isImporting.asStateFlow()
+
+    private val _deleteConfirmBookId = MutableStateFlow<String?>(null)
+    val deleteConfirmBookId: StateFlow<String?> = _deleteConfirmBookId.asStateFlow()
+
+    fun setSortMode(mode: SortMode) {
+        _sortMode.value = mode
+    }
 
     fun importBook(uri: Uri) {
         viewModelScope.launch {
@@ -47,10 +72,20 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
-    fun removeBook(bookId: String) {
+    fun requestDelete(bookId: String) {
+        _deleteConfirmBookId.value = bookId
+    }
+
+    fun confirmDelete() {
+        val bookId = _deleteConfirmBookId.value ?: return
         viewModelScope.launch {
             bookRepository.removeBook(bookId)
+            _deleteConfirmBookId.value = null
         }
+    }
+
+    fun cancelDelete() {
+        _deleteConfirmBookId.value = null
     }
 
     fun loadBook(uriString: String): EbookBook? {

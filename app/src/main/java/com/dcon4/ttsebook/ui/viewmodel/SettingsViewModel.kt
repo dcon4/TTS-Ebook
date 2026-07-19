@@ -1,8 +1,8 @@
 package com.dcon4.ttsebook.ui.viewmodel
 
 import android.app.Application
+import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.speech.tts.TextToSpeech
 import android.speech.tts.Voice
 import androidx.core.content.FileProvider
@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -27,6 +26,13 @@ class SettingsViewModel @Inject constructor(
     application: Application,
     private val ttsManager: TtsManager
 ) : AndroidViewModel(application) {
+
+    companion object {
+        private const val PREFS_NAME = "ttsebook_settings"
+        private const val KEY_VERBOSE_LOGGING = "verbose_logging"
+    }
+
+    private val prefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private val _engines = MutableStateFlow<List<TextToSpeech.EngineInfo>>(emptyList())
     val engines: StateFlow<List<TextToSpeech.EngineInfo>> = _engines.asStateFlow()
@@ -43,8 +49,10 @@ class SettingsViewModel @Inject constructor(
     private val _speechRate = MutableStateFlow(1.0f)
     val speechRate: StateFlow<Float> = _speechRate.asStateFlow()
 
-    private val _fontSize = MutableStateFlow(16)
-    val fontSize: StateFlow<Int> = _fontSize.asStateFlow()
+    private val _verboseEnabled = MutableStateFlow(
+        prefs.getBoolean(KEY_VERBOSE_LOGGING, true)
+    )
+    val verboseEnabled: StateFlow<Boolean> = _verboseEnabled.asStateFlow()
 
     init {
         loadTtsSettings()
@@ -85,8 +93,12 @@ class SettingsViewModel @Inject constructor(
         ttsManager.setSpeechRate(rate)
     }
 
-    fun setFontSize(size: Int) {
-        _fontSize.value = size
+    fun toggleVerboseLogging() {
+        val newValue = !_verboseEnabled.value
+        _verboseEnabled.value = newValue
+        prefs.edit().putBoolean(KEY_VERBOSE_LOGGING, newValue).apply()
+        DebugLogger.verboseEnabled = newValue
+        DebugLogger.verbose("SettingsViewModel", "Verbose logging toggled to $newValue")
     }
 
     fun getShareLogIntent(): Intent? {

@@ -1,5 +1,6 @@
 package com.dcon4.ttsebook.ui.screen
 
+import android.content.Intent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -10,13 +11,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.dcon4.ttsebook.BuildConfig
+import com.dcon4.ttsebook.debug.DebugLogger
 import com.dcon4.ttsebook.ui.viewmodel.ReaderViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,6 +42,9 @@ fun ReaderScreen(
     val currentParagraphIndex by viewModel.currentParagraphIndex.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
     val listState = rememberLazyListState()
+    val context = LocalContext.current
+
+    var showDebugDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(bookId) {
         viewModel.loadBook(bookId, initialChapterIndex, initialParagraphIndex)
@@ -68,6 +79,12 @@ fun ReaderScreen(
                 },
                 actions = {
                     IconButton(
+                        onClick = { showDebugDialog = true },
+                        modifier = Modifier.semantics { contentDescription = "Share debug log" }
+                    ) {
+                        Icon(Icons.Default.BugReport, contentDescription = null)
+                    }
+                    IconButton(
                         onClick = onNavigateToSearch,
                         modifier = Modifier.semantics { contentDescription = "Search" }
                     ) {
@@ -91,12 +108,14 @@ fun ReaderScreen(
         bottomBar = {
             Surface(
                 tonalElevation = 3.dp,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .padding(horizontal = 8.dp, vertical = 8.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -105,39 +124,49 @@ fun ReaderScreen(
                     ) {
                         IconButton(
                             onClick = { viewModel.prevChapter() },
-                            modifier = Modifier.semantics { contentDescription = "Previous chapter" }
+                            modifier = Modifier
+                                .size(48.dp)
+                                .semantics { contentDescription = "Previous chapter" }
                         ) {
-                            Icon(Icons.Default.SkipPrevious, contentDescription = null)
+                            Icon(Icons.Default.SkipPrevious, contentDescription = null, modifier = Modifier.size(28.dp))
                         }
                         IconButton(
                             onClick = { viewModel.prevParagraph() },
-                            modifier = Modifier.semantics { contentDescription = "Previous paragraph" }
+                            modifier = Modifier
+                                .size(48.dp)
+                                .semantics { contentDescription = "Previous paragraph" }
                         ) {
-                            Icon(Icons.Default.NavigateBefore, contentDescription = null)
+                            Icon(Icons.Default.NavigateBefore, contentDescription = null, modifier = Modifier.size(28.dp))
                         }
                         FilledIconButton(
                             onClick = { viewModel.togglePlayPause() },
-                            modifier = Modifier.size(56.dp).semantics {
-                                contentDescription = if (isPlaying) "Pause" else "Play"
-                            }
+                            modifier = Modifier
+                                .size(64.dp)
+                                .semantics {
+                                    contentDescription = if (isPlaying) "Pause" else "Play"
+                                }
                         ) {
                             Icon(
                                 if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                 contentDescription = null,
-                                modifier = Modifier.size(32.dp)
+                                modifier = Modifier.size(36.dp)
                             )
                         }
                         IconButton(
                             onClick = { viewModel.nextParagraph() },
-                            modifier = Modifier.semantics { contentDescription = "Next paragraph" }
+                            modifier = Modifier
+                                .size(48.dp)
+                                .semantics { contentDescription = "Next paragraph" }
                         ) {
-                            Icon(Icons.Default.NavigateNext, contentDescription = null)
+                            Icon(Icons.Default.NavigateNext, contentDescription = null, modifier = Modifier.size(28.dp))
                         }
                         IconButton(
                             onClick = { viewModel.nextChapter() },
-                            modifier = Modifier.semantics { contentDescription = "Next chapter" }
+                            modifier = Modifier
+                                .size(48.dp)
+                                .semantics { contentDescription = "Next chapter" }
                         ) {
-                            Icon(Icons.Default.SkipNext, contentDescription = null)
+                            Icon(Icons.Default.SkipNext, contentDescription = null, modifier = Modifier.size(28.dp))
                         }
                     }
                     Text(
@@ -173,24 +202,15 @@ fun ReaderScreen(
                     .fillMaxSize()
                     .padding(padding)
                     .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 itemsIndexed(paragraphs) { index, paragraph ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .then(
-                                if (index == currentParagraphIndex) Modifier.semantics {
-                                    contentDescription = "Current paragraph, double tap to play"
-                                } else Modifier
-                            ),
-                        colors = if (index == currentParagraphIndex) {
-                            CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer
-                            )
-                        } else {
-                            CardDefaults.cardColors()
-                        }
+                    Surface(
+                        color = if (index == currentParagraphIndex)
+                            MaterialTheme.colorScheme.primaryContainer
+                        else Color.Transparent,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
                             text = paragraph,
@@ -203,5 +223,53 @@ fun ReaderScreen(
                 }
             }
         }
+    }
+
+    if (showDebugDialog) {
+        AlertDialog(
+            onDismissRequest = { showDebugDialog = false },
+            title = { Text("Debug Log") },
+            text = { Text("Share the debug log file with another app, or open an email with the subject and file pre-filled.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val file = DebugLogger.getLogFile()?.takeIf { it.exists() }
+                    if (file != null) {
+                        val uri = androidx.core.content.FileProvider.getUriForFile(
+                            context,
+                            "${BuildConfig.APPLICATION_ID}.debug.fileprovider",
+                            file
+                        )
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(Intent.createChooser(intent, "Share debug log"))
+                    }
+                    showDebugDialog = false
+                }) { Text("Share") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    val file = DebugLogger.getLogFile()?.takeIf { it.exists() }
+                    if (file != null) {
+                        val uri = androidx.core.content.FileProvider.getUriForFile(
+                            context,
+                            "${BuildConfig.APPLICATION_ID}.debug.fileprovider",
+                            file
+                        )
+                        val dateTime = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "message/rfc822"
+                            putExtra(Intent.EXTRA_SUBJECT, "TTS Ebook debug log - $dateTime")
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(Intent.createChooser(intent, "Email debug log"))
+                    }
+                    showDebugDialog = false
+                }) { Text("Email") }
+            }
+        )
     }
 }
