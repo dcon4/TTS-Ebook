@@ -319,28 +319,32 @@ class TtsPlaybackService : Service() {
     private fun savePosition() {
         if (bookId.isBlank()) return
         val chapterTitle = chapters.getOrNull(currentChapterIndex)?.title ?: ""
-        positionDao.upsertPosition(
-            PositionEntity(
-                bookId = bookId,
-                chapterIndex = currentChapterIndex,
-                paragraphIndex = currentParagraphIndex,
-                chapterTitle = chapterTitle
+        kotlinx.coroutines.GlobalScope.launch {
+            positionDao.upsertPosition(
+                PositionEntity(
+                    bookId = bookId,
+                    chapterIndex = currentChapterIndex,
+                    paragraphIndex = currentParagraphIndex,
+                    chapterTitle = chapterTitle
+                )
             )
-        )
+        }
     }
 
     private fun addBookmark() {
         if (bookId.isBlank() || chapters.isEmpty()) return
         val chapterTitle = chapters.getOrNull(currentChapterIndex)?.title ?: "Chapter ${currentChapterIndex + 1}"
         val label = "$bookTitle - $chapterTitle (paragraph ${currentParagraphIndex + 1})"
-        bookmarkDao.addBookmark(
-            BookmarkEntity(
-                bookId = bookId,
-                chapterIndex = currentChapterIndex,
-                paragraphIndex = currentParagraphIndex,
-                label = label
+        kotlinx.coroutines.GlobalScope.launch {
+            bookmarkDao.addBookmark(
+                BookmarkEntity(
+                    bookId = bookId,
+                    chapterIndex = currentChapterIndex,
+                    paragraphIndex = currentParagraphIndex,
+                    label = label
+                )
             )
-        )
+        }
         DebugLogger.log(TAG, "Bookmark added: $label")
     }
 
