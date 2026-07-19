@@ -107,9 +107,26 @@ class TtsPlaybackService : Service() {
         }
     }
 
+    private var loadingNotificationBuilt = false
+
+    private fun buildLoadingNotification(): Notification {
+        return NotificationCompat.Builder(this, "ttsebook_playback")
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle("TTS Ebook")
+            .setContentText("Loading...")
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .build()
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_PLAY -> {
+                if (!loadingNotificationBuilt) {
+                    startForeground(NOTIFICATION_ID, buildLoadingNotification())
+                    loadingNotificationBuilt = true
+                }
                 val bookIdExtra = intent.getStringExtra("bookId")
                 if (bookIdExtra != null && bookIdExtra != bookId) {
                     kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.CoroutineExceptionHandler { _, e ->
@@ -117,7 +134,9 @@ class TtsPlaybackService : Service() {
                     }) {
                         try {
                             val entity = bookRepository.getBook(bookIdExtra) ?: return@launch
-                            val bookEbook = bookRepository.loadBook(entity.filePath) ?: return@launch
+                            val bookEbook = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                bookRepository.loadBook(entity.filePath)
+                            } ?: return@launch
                             chapters = bookEbook.chapters
                             this@TtsPlaybackService.bookId = bookEbook.id
                             this@TtsPlaybackService.bookTitle = bookEbook.title
