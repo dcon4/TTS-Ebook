@@ -48,11 +48,34 @@ class ReaderViewModel @Inject constructor(
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
+    private val _paragraphs = MutableStateFlow<List<String>>(emptyList())
+    val paragraphs: StateFlow<List<String>> = _paragraphs.asStateFlow()
+
+    private val _paragraphCount = MutableStateFlow(0)
+    val paragraphCount: StateFlow<Int> = _paragraphCount.asStateFlow()
+
     private val _bookmarks = MutableStateFlow<List<BookmarkEntity>>(emptyList())
     val bookmarks: StateFlow<List<BookmarkEntity>> = _bookmarks.asStateFlow()
 
     var bookEntity: BookEntity? = null
         private set
+
+    private fun computeParagraphs(book: EbookBook?, chapterIndex: Int): List<String> {
+        val chapter = book?.chapters?.getOrNull(chapterIndex) ?: return emptyList()
+        return chapter.content.split(Regex("\\n\\s*\\n"))
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+    }
+
+    fun updateParagraphs() {
+        val book = _currentBook.value
+        val ci = _currentChapterIndex.value
+        viewModelScope.launch(Dispatchers.Default) {
+            val list = computeParagraphs(book, ci)
+            _paragraphs.value = list
+            _paragraphCount.value = list.size
+        }
+    }
 
     private val positionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -60,6 +83,7 @@ class ReaderViewModel @Inject constructor(
                 _currentChapterIndex.value = intent.getIntExtra(TtsPlaybackService.EXTRA_CHAPTER_INDEX, 0)
                 _currentParagraphIndex.value = intent.getIntExtra(TtsPlaybackService.EXTRA_PARAGRAPH_INDEX, 0)
                 _isPlaying.value = intent.getBooleanExtra(TtsPlaybackService.EXTRA_IS_PLAYING, false)
+                updateParagraphs()
             }
         }
     }
@@ -104,6 +128,11 @@ class ReaderViewModel @Inject constructor(
                     _currentChapterIndex.value = pos?.chapterIndex ?: 0
                     _currentParagraphIndex.value = pos?.paragraphIndex ?: 0
                 }
+                val list = withContext(Dispatchers.Default) {
+                    computeParagraphs(ebook, _currentChapterIndex.value)
+                }
+                _paragraphs.value = list
+                _paragraphCount.value = list.size
                 val intent = Intent(getApplication(), TtsPlaybackService::class.java).apply {
                     action = TtsPlaybackService.ACTION_PLAY
                     putExtra("bookId", ebook.id)

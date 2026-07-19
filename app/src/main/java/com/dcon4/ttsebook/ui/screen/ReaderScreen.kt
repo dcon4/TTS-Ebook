@@ -42,6 +42,8 @@ fun ReaderScreen(
     val currentChapterIndex by viewModel.currentChapterIndex.collectAsState()
     val currentParagraphIndex by viewModel.currentParagraphIndex.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
+    val paragraphs by viewModel.paragraphs.collectAsState()
+    val paragraphCount by viewModel.paragraphCount.collectAsState()
     val listState = rememberLazyListState()
     val context = LocalContext.current
 
@@ -51,8 +53,8 @@ fun ReaderScreen(
         viewModel.loadBook(bookId, initialChapterIndex, initialParagraphIndex)
     }
 
-    LaunchedEffect(currentParagraphIndex) {
-        if (currentParagraphIndex >= 0) {
+    LaunchedEffect(currentParagraphIndex, paragraphs) {
+        if (currentParagraphIndex in paragraphs.indices) {
             listState.animateScrollToItem(currentParagraphIndex)
         }
     }
@@ -177,10 +179,7 @@ fun ReaderScreen(
                         }
                     }
                     Text(
-                        text = "Chapter ${currentChapterIndex + 1} Paragraph ${currentParagraphIndex + 1}/" +
-                                (currentBook?.chapters?.getOrNull(currentChapterIndex)?.let { chapter ->
-                                    chapter.content.split(Regex("\\n\\s*\\n")).size
-                                } ?: "0"),
+                        text = "Chapter ${currentChapterIndex + 1} Paragraph ${currentParagraphIndex + 1}/$paragraphCount",
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center
@@ -189,12 +188,6 @@ fun ReaderScreen(
             }
         }
     ) { padding ->
-        val paragraphs = currentBook?.chapters?.getOrNull(currentChapterIndex)?.let { chapter ->
-            chapter.content.split(Regex("\\n\\s*\\n"))
-                .map { p -> p.trim() }
-                .filter { p -> p.isNotBlank() }
-        } ?: emptyList()
-
         if (paragraphs.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize().padding(padding),
