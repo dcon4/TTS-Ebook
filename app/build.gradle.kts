@@ -84,7 +84,11 @@ dependencies {
 
     implementation("androidx.media:media:1.7.0")
     implementation("org.jsoup:jsoup:1.18.3")
-    implementation("nl.siegmann.epublib:epublib-core:3.1")
+    implementation("nl.siegmann.epublib:epublib-core:3.1") {
+        exclude(group = "org.slf4j")
+        exclude(group = "xmlpull")
+    }
+    implementation("org.slf4j:slf4j-android:1.7.25")
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
 
     testImplementation("junit:junit:4.13.2")
