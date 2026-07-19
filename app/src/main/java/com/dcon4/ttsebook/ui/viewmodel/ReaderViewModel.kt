@@ -14,6 +14,7 @@ import androidx.lifecycle.viewModelScope
 import com.dcon4.ttsebook.data.BookEntity
 import com.dcon4.ttsebook.data.BookRepository
 import com.dcon4.ttsebook.data.BookmarkEntity
+import com.dcon4.ttsebook.data.EbookBook
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.dcon4.ttsebook.debug.DebugLogger

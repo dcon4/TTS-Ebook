@@ -178,8 +178,8 @@ fun ReaderScreen(
                     }
                     Text(
                         text = "Chapter ${currentChapterIndex + 1} Paragraph ${currentParagraphIndex + 1}/" +
-                                (currentBook?.chapters?.getOrNull(currentChapterIndex)?.let {
-                                    it.content.split(Regex("\\n\\s*\\n")).size
+                                (currentBook?.chapters?.getOrNull(currentChapterIndex)?.let { chapter ->
+                                    chapter.content.split(Regex("\\n\\s*\\n")).size
                                 } ?: "0"),
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.fillMaxWidth(),
@@ -189,8 +189,8 @@ fun ReaderScreen(
             }
         }
     ) { padding ->
-        val paragraphs = currentBook?.chapters?.getOrNull(currentChapterIndex)?.let {
-            it.content.split(Regex("\\n\\s*\\n"))
+        val paragraphs = currentBook?.chapters?.getOrNull(currentChapterIndex)?.let { chapter ->
+            chapter.content.split(Regex("\\n\\s*\\n"))
                 .map { p -> p.trim() }
                 .filter { p -> p.isNotBlank() }
         } ?: emptyList()
