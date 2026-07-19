@@ -5,8 +5,11 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
@@ -129,12 +132,12 @@ class TtsPlaybackService : Service() {
                 }
                 val bookIdExtra = intent.getStringExtra("bookId")
                 if (bookIdExtra != null && bookIdExtra != bookId) {
-                    kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.CoroutineExceptionHandler { _, e ->
+                    GlobalScope.launch(CoroutineExceptionHandler { _, e ->
                         DebugLogger.logException(TAG, "Play coroutine failed", e)
                     }) {
                         try {
                             val entity = bookRepository.getBook(bookIdExtra) ?: return@launch
-                            val bookEbook = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            val bookEbook = withContext(Dispatchers.IO) {
                                 bookRepository.loadBook(entity.filePath)
                             } ?: return@launch
                             chapters = bookEbook.chapters
@@ -378,7 +381,7 @@ class TtsPlaybackService : Service() {
     private fun savePosition() {
         if (bookId.isBlank()) return
         val chapterTitle = chapters.getOrNull(currentChapterIndex)?.title ?: ""
-        kotlinx.coroutines.GlobalScope.launch {
+        GlobalScope.launch {
             positionDao.upsertPosition(
                 PositionEntity(
                     bookId = bookId,
@@ -394,7 +397,7 @@ class TtsPlaybackService : Service() {
         if (bookId.isBlank() || chapters.isEmpty()) return
         val chapterTitle = chapters.getOrNull(currentChapterIndex)?.title ?: "Chapter ${currentChapterIndex + 1}"
         val label = "$bookTitle - $chapterTitle (paragraph ${currentParagraphIndex + 1})"
-        kotlinx.coroutines.GlobalScope.launch {
+        GlobalScope.launch {
             bookmarkDao.addBookmark(
                 BookmarkEntity(
                     bookId = bookId,
