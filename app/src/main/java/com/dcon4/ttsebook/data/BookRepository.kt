@@ -138,7 +138,7 @@ class BookRepository @Inject constructor(
                 inputStream.close()
                 ebook
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             DebugLogger.logException(TAG, "Load book failed", e)
             null
         }

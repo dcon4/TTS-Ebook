@@ -118,7 +118,7 @@ class ReaderViewModel @Inject constructor(
                 } else {
                     getApplication<Application>().startService(intent)
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 DebugLogger.logException(TAG, "loadBook failed", e)
             }
         }

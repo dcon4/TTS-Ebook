@@ -127,7 +127,11 @@ class TtsPlaybackService : Service() {
         when (intent?.action) {
             ACTION_PLAY -> {
                 if (!loadingNotificationBuilt) {
-                    startForeground(NOTIFICATION_ID, buildLoadingNotification())
+                    try {
+                        startForeground(NOTIFICATION_ID, buildLoadingNotification())
+                    } catch (e: Exception) {
+                        DebugLogger.log(TAG, "Loading notification failed: ${e.message}")
+                    }
                     loadingNotificationBuilt = true
                 }
                 val bookIdExtra = intent.getStringExtra("bookId")
@@ -149,7 +153,7 @@ class TtsPlaybackService : Service() {
                             this@TtsPlaybackService.currentParagraphIndex = intent.getIntExtra("startParagraph", 0)
                                 .coerceIn(0, paragraphs.lastIndex.coerceAtLeast(0))
                             resume()
-                        } catch (e: Exception) {
+                        } catch (e: Throwable) {
                             DebugLogger.logException(TAG, "Play action failed", e)
                         }
                     }
