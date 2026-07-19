@@ -1,7 +1,10 @@
 package com.dcon4.ttsebook.ui.viewmodel
 
 import android.app.Application
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.dcon4.ttsebook.data.BookEntity
@@ -45,7 +48,40 @@ class ReaderViewModel @Inject constructor(
     var bookEntity: BookEntity? = null
         private set
 
+    private val positionReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == TtsPlaybackService.ACTION_POSITION_CHANGED) {
+                _currentChapterIndex.value = intent.getIntExtra(TtsPlaybackService.EXTRA_CHAPTER_INDEX, 0)
+                _currentParagraphIndex.value = intent.getIntExtra(TtsPlaybackService.EXTRA_PARAGRAPH_INDEX, 0)
+                _isPlaying.value = intent.getBooleanExtra(TtsPlaybackService.EXTRA_IS_PLAYING, false)
+            }
+        }
+    }
+
+    private var receiverRegistered = false
+
+    private fun registerPositionReceiver() {
+        if (!receiverRegistered) {
+            getApplication<Application>().registerReceiver(
+                positionReceiver,
+                IntentFilter(TtsPlaybackService.ACTION_POSITION_CHANGED)
+            )
+            receiverRegistered = true
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        if (receiverRegistered) {
+            try {
+                getApplication<Application>().unregisterReceiver(positionReceiver)
+            } catch (_: Exception) { }
+            receiverRegistered = false
+        }
+    }
+
     fun loadBook(bookId: String, initialChapterIndex: Int = -1, initialParagraphIndex: Int = -1) {
+        registerPositionReceiver()
         viewModelScope.launch {
             val entity = bookRepository.getBook(bookId) ?: return@launch
             bookEntity = entity
@@ -74,70 +110,43 @@ class ReaderViewModel @Inject constructor(
         getApplication<Application>().startForegroundService(
             TtsPlaybackService.playIntent(getApplication())
         )
-        _isPlaying.value = true
     }
 
     fun pause() {
         getApplication<Application>().startService(
             TtsPlaybackService.pauseIntent(getApplication())
         )
-        _isPlaying.value = false
     }
 
     fun togglePlayPause() {
-        if (_isPlaying.value) pause() else play()
+        getApplication<Application>().startService(
+            if (_isPlaying.value) TtsPlaybackService.pauseIntent(getApplication())
+            else TtsPlaybackService.playIntent(getApplication())
+        )
     }
 
     fun nextParagraph() {
         getApplication<Application>().startService(
             TtsPlaybackService.nextIntent(getApplication())
         )
-        val ci = _currentChapterIndex.value
-        val pi = _currentParagraphIndex.value + 1
-        val chapter = _currentBook.value?.chapters?.getOrNull(ci)
-        val paraCount = chapter?.content?.split(Regex("\\n\\s*\\n"))
-            ?.map { it.trim() }?.filter { it.isNotBlank() }?.size ?: 0
-        if (pi < paraCount) {
-            _currentParagraphIndex.value = pi
-        } else {
-            _currentChapterIndex.value = ci + 1
-            _currentParagraphIndex.value = 0
-        }
     }
 
     fun prevParagraph() {
         getApplication<Application>().startService(
             TtsPlaybackService.prevIntent(getApplication())
         )
-        if (_currentParagraphIndex.value > 0) {
-            _currentParagraphIndex.value = _currentParagraphIndex.value - 1
-        } else if (_currentChapterIndex.value > 0) {
-            _currentChapterIndex.value = _currentChapterIndex.value - 1
-            val chapter = _currentBook.value?.chapters?.getOrNull(_currentChapterIndex.value)
-            val paraCount = chapter?.content?.split(Regex("\\n\\s*\\n"))
-                ?.map { it.trim() }?.filter { it.isNotBlank() }?.size ?: 0
-            _currentParagraphIndex.value = (paraCount - 1).coerceAtLeast(0)
-        }
     }
 
     fun nextChapter() {
         getApplication<Application>().startService(
             TtsPlaybackService.nextChapterIntent(getApplication())
         )
-        if (_currentChapterIndex.value < (_currentBook.value?.chapters?.size ?: 1) - 1) {
-            _currentChapterIndex.value = _currentChapterIndex.value + 1
-            _currentParagraphIndex.value = 0
-        }
     }
 
     fun prevChapter() {
         getApplication<Application>().startService(
             TtsPlaybackService.prevChapterIntent(getApplication())
         )
-        if (_currentChapterIndex.value > 0) {
-            _currentChapterIndex.value = _currentChapterIndex.value - 1
-            _currentParagraphIndex.value = 0
-        }
     }
 
     fun jumpTo(chapterIndex: Int, paragraphIndex: Int) {

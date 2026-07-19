@@ -42,6 +42,11 @@ class TtsPlaybackService : Service() {
         const val ACTION_PREV_CHAPTER = "com.dcon4.ttsebook.action.PREV_CHAPTER"
         const val ACTION_BOOKMARK = "com.dcon4.ttsebook.action.BOOKMARK"
         const val ACTION_STOP = "com.dcon4.ttsebook.action.STOP"
+        const val ACTION_POSITION_CHANGED = "com.dcon4.ttsebook.action.POSITION_CHANGED"
+        const val EXTRA_CHAPTER_INDEX = "chapterIndex"
+        const val EXTRA_PARAGRAPH_INDEX = "paragraphIndex"
+        const val EXTRA_PARAGRAPH_COUNT = "paragraphCount"
+        const val EXTRA_IS_PLAYING = "isPlaying"
         const val NOTIFICATION_ID = 1001
         private const val TAG = "TtsPlaybackService"
 
@@ -156,6 +161,7 @@ class TtsPlaybackService : Service() {
         this.currentChapterIndex = startChapter.coerceIn(0, chapters.lastIndex)
         loadChapterParagraphs()
         currentParagraphIndex = startParagraph.coerceIn(0, paragraphs.lastIndex)
+        broadcastPosition()
         DebugLogger.log(TAG, "Set book: $title chapter=$currentChapterIndex para=$currentParagraphIndex")
     }
 
@@ -180,6 +186,7 @@ class TtsPlaybackService : Service() {
         } else {
             speakCurrent()
         }
+        broadcastPosition()
         updateNotification()
         updateMediaSession()
     }
@@ -188,6 +195,7 @@ class TtsPlaybackService : Service() {
         isPlaying = false
         ttsManager.stop()
         abandonAudioFocus()
+        broadcastPosition()
         updateNotification()
         updateMediaSession()
         savePosition()
@@ -201,6 +209,7 @@ class TtsPlaybackService : Service() {
         if (currentParagraphIndex < paragraphs.lastIndex) {
             currentParagraphIndex++
             if (isPlaying) speakCurrent()
+            broadcastPosition()
             updateNotification()
             updateMediaSession()
             savePosition()
@@ -209,6 +218,7 @@ class TtsPlaybackService : Service() {
             loadChapterParagraphs()
             currentParagraphIndex = 0
             if (isPlaying) speakCurrent()
+            broadcastPosition()
             updateNotification()
             updateMediaSession()
             savePosition()
@@ -219,6 +229,7 @@ class TtsPlaybackService : Service() {
         if (currentParagraphIndex > 0) {
             currentParagraphIndex--
             if (isPlaying) speakCurrent()
+            broadcastPosition()
             updateNotification()
             updateMediaSession()
             savePosition()
@@ -227,6 +238,7 @@ class TtsPlaybackService : Service() {
             loadChapterParagraphs()
             currentParagraphIndex = paragraphs.lastIndex
             if (isPlaying) speakCurrent()
+            broadcastPosition()
             updateNotification()
             updateMediaSession()
             savePosition()
@@ -239,6 +251,7 @@ class TtsPlaybackService : Service() {
             loadChapterParagraphs()
             currentParagraphIndex = 0
             if (isPlaying) speakCurrent()
+            broadcastPosition()
             updateNotification()
             updateMediaSession()
             savePosition()
@@ -251,6 +264,7 @@ class TtsPlaybackService : Service() {
             loadChapterParagraphs()
             currentParagraphIndex = 0
             if (isPlaying) speakCurrent()
+            broadcastPosition()
             updateNotification()
             updateMediaSession()
             savePosition()
@@ -262,6 +276,7 @@ class TtsPlaybackService : Service() {
         loadChapterParagraphs()
         currentParagraphIndex = paragraphIndex.coerceIn(0, paragraphs.lastIndex)
         if (isPlaying) speakCurrent()
+        broadcastPosition()
         updateNotification()
         updateMediaSession()
         savePosition()
@@ -318,8 +333,18 @@ class TtsPlaybackService : Service() {
         } else {
             pause()
         }
+        broadcastPosition()
         updateNotification()
         updateMediaSession()
+    }
+
+    private fun broadcastPosition() {
+        sendBroadcast(Intent(ACTION_POSITION_CHANGED).apply {
+            putExtra(EXTRA_CHAPTER_INDEX, currentChapterIndex)
+            putExtra(EXTRA_PARAGRAPH_INDEX, currentParagraphIndex)
+            putExtra(EXTRA_PARAGRAPH_COUNT, paragraphs.size)
+            putExtra(EXTRA_IS_PLAYING, isPlaying)
+        })
     }
 
     private fun savePosition() {
