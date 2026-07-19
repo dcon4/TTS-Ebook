@@ -159,7 +159,9 @@ fun LibraryScreen(
                             )
                         }
                     }
-                    items(books, key = { it.id }) { book ->
+                    val recentIds = recentBooks.map { it.id }.toSet()
+                    val remainingBooks = books.filter { it.id !in recentIds }
+                    items(remainingBooks, key = { it.id }) { book ->
                         BookListItem(
                             book = book,
                             dateFormatter = dateFormatter,

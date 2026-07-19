@@ -14,7 +14,8 @@ import androidx.lifecycle.viewModelScope
 import com.dcon4.ttsebook.data.BookEntity
 import com.dcon4.ttsebook.data.BookRepository
 import com.dcon4.ttsebook.data.BookmarkEntity
-import com.dcon4.ttsebook.data.EbookBook
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.dcon4.ttsebook.debug.DebugLogger
 import com.dcon4.ttsebook.playback.TtsPlaybackService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -90,7 +91,9 @@ class ReaderViewModel @Inject constructor(
             try {
                 val entity = bookRepository.getBook(bookId) ?: return@launch
                 bookEntity = entity
-                val ebook = bookRepository.loadBook(entity.filePath) ?: return@launch
+                val ebook = withContext(Dispatchers.IO) {
+                    bookRepository.loadBook(entity.filePath)
+                } ?: return@launch
                 _currentBook.value = ebook
                 if (initialChapterIndex >= 0 && initialParagraphIndex >= 0) {
                     _currentChapterIndex.value = initialChapterIndex
