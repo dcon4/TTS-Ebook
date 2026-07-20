@@ -17,6 +17,7 @@ import com.dcon4.ttsebook.data.BookmarkEntity
 import com.dcon4.ttsebook.data.EbookBook
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.dcon4.ttsebook.data.EbookChapter
 import com.dcon4.ttsebook.debug.DebugLogger
 import com.dcon4.ttsebook.playback.TtsPlaybackService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -56,6 +57,9 @@ class ReaderViewModel @Inject constructor(
 
     private val _bookmarks = MutableStateFlow<List<BookmarkEntity>>(emptyList())
     val bookmarks: StateFlow<List<BookmarkEntity>> = _bookmarks.asStateFlow()
+
+    private val _chapters = MutableStateFlow<List<EbookChapter>>(emptyList())
+    val chapters: StateFlow<List<EbookChapter>> = _chapters.asStateFlow()
 
     var bookEntity: BookEntity? = null
         private set
@@ -143,6 +147,7 @@ class ReaderViewModel @Inject constructor(
                 val t4 = System.currentTimeMillis()
                 DebugLogger.log(TAG, "loadBook: loadBook ${t4-t3}ms chapters=${ebook.chapters.size}")
                 _currentBook.value = ebook
+                _chapters.value = ebook.chapters
                 if (initialChapterIndex >= 0 && initialParagraphIndex >= 0) {
                     _currentChapterIndex.value = initialChapterIndex
                     _currentParagraphIndex.value = initialParagraphIndex

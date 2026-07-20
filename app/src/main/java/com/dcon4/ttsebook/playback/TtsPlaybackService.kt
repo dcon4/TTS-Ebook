@@ -375,6 +375,7 @@ class TtsPlaybackService : Service() {
 
     private fun broadcastPosition() {
         sendBroadcast(Intent(ACTION_POSITION_CHANGED).apply {
+            setPackage(packageName)
             putExtra(EXTRA_CHAPTER_INDEX, currentChapterIndex)
             putExtra(EXTRA_PARAGRAPH_INDEX, currentParagraphIndex)
             putExtra(EXTRA_PARAGRAPH_COUNT, paragraphs.size)

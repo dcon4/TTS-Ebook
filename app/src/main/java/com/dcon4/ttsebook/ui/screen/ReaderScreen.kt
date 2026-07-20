@@ -44,10 +44,12 @@ fun ReaderScreen(
     val isPlaying by viewModel.isPlaying.collectAsState()
     val paragraphs by viewModel.paragraphs.collectAsState()
     val paragraphCount by viewModel.paragraphCount.collectAsState()
+    val chapters by viewModel.chapters.collectAsState()
     val listState = rememberLazyListState()
     val context = LocalContext.current
 
     var showDebugDialog by remember { mutableStateOf(false) }
+    var showChapterDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(bookId) {
         viewModel.loadBook(bookId, initialChapterIndex, initialParagraphIndex)
@@ -98,6 +100,12 @@ fun ReaderScreen(
                         modifier = Modifier.semantics { contentDescription = "Search" }
                     ) {
                         Icon(Icons.Default.Search, contentDescription = null)
+                    }
+                    IconButton(
+                        onClick = { showChapterDialog = true },
+                        modifier = Modifier.semantics { contentDescription = "Table of contents" }
+                    ) {
+                        Icon(Icons.Default.MenuBook, contentDescription = null)
                     }
                     IconButton(
                         onClick = { viewModel.addBookmark() },
@@ -223,6 +231,45 @@ fun ReaderScreen(
                 }
             }
         }
+    }
+
+    if (showChapterDialog) {
+        AlertDialog(
+            onDismissRequest = { showChapterDialog = false },
+            title = { Text("Chapters") },
+            text = {
+                if (chapters.isEmpty()) {
+                    Text("No chapters available")
+                } else {
+                    LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                        itemsIndexed(chapters) { index, chapter ->
+                            Surface(
+                                color = if (index == currentChapterIndex)
+                                    MaterialTheme.colorScheme.primaryContainer
+                                else Color.Transparent,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp),
+                                onClick = {
+                                    viewModel.jumpTo(index, 0)
+                                    showChapterDialog = false
+                                }
+                            ) {
+                                Text(
+                                    text = chapter.title.ifBlank { "Chapter ${index + 1}" },
+                                    modifier = Modifier.padding(12.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showChapterDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
     }
 
     if (showDebugDialog) {
