@@ -229,16 +229,9 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun jumpTo(chapterIndex: Int, paragraphIndex: Int) {
-        _currentChapterIndex.value = chapterIndex
-        _currentParagraphIndex.value = paragraphIndex
-        val intent = Intent(getApplication(), TtsPlaybackService::class.java).apply {
-            action = TtsPlaybackService.ACTION_PLAY
-            putExtra("bookId", _currentBook.value?.id ?: "")
-            putExtra("bookTitle", _currentBook.value?.title ?: "")
-            putExtra("startChapter", chapterIndex)
-            putExtra("startParagraph", paragraphIndex)
-        }
-        getApplication<Application>().startForegroundService(intent)
+        getApplication<Application>().startService(
+            TtsPlaybackService.jumpToIntent(getApplication(), chapterIndex, paragraphIndex)
+        )
     }
 
     fun addBookmark() {

@@ -43,6 +43,7 @@ class TtsPlaybackService : Service() {
         const val ACTION_PREVIOUS = "com.dcon4.ttsebook.action.PREVIOUS"
         const val ACTION_NEXT_CHAPTER = "com.dcon4.ttsebook.action.NEXT_CHAPTER"
         const val ACTION_PREV_CHAPTER = "com.dcon4.ttsebook.action.PREV_CHAPTER"
+        const val ACTION_JUMP_TO = "com.dcon4.ttsebook.action.JUMP_TO"
         const val ACTION_BOOKMARK = "com.dcon4.ttsebook.action.BOOKMARK"
         const val ACTION_STOP = "com.dcon4.ttsebook.action.STOP"
         const val ACTION_POSITION_CHANGED = "com.dcon4.ttsebook.action.POSITION_CHANGED"
@@ -59,6 +60,10 @@ class TtsPlaybackService : Service() {
         fun prevIntent(context: Context): Intent = Intent(context, TtsPlaybackService::class.java).setAction(ACTION_PREVIOUS)
         fun nextChapterIntent(context: Context): Intent = Intent(context, TtsPlaybackService::class.java).setAction(ACTION_NEXT_CHAPTER)
         fun prevChapterIntent(context: Context): Intent = Intent(context, TtsPlaybackService::class.java).setAction(ACTION_PREV_CHAPTER)
+        fun jumpToIntent(context: Context, chapterIndex: Int, paragraphIndex: Int): Intent =
+            Intent(context, TtsPlaybackService::class.java).setAction(ACTION_JUMP_TO)
+                .putExtra(EXTRA_CHAPTER_INDEX, chapterIndex)
+                .putExtra(EXTRA_PARAGRAPH_INDEX, paragraphIndex)
         fun bookmarkIntent(context: Context): Intent = Intent(context, TtsPlaybackService::class.java).setAction(ACTION_BOOKMARK)
         fun stopIntent(context: Context): Intent = Intent(context, TtsPlaybackService::class.java).setAction(ACTION_STOP)
     }
@@ -166,6 +171,11 @@ class TtsPlaybackService : Service() {
             ACTION_PREVIOUS -> prevParagraph()
             ACTION_NEXT_CHAPTER -> nextChapter()
             ACTION_PREV_CHAPTER -> prevChapter()
+            ACTION_JUMP_TO -> {
+                val ci = intent?.getIntExtra(EXTRA_CHAPTER_INDEX, 0) ?: 0
+                val pi = intent?.getIntExtra(EXTRA_PARAGRAPH_INDEX, 0) ?: 0
+                jumpTo(ci, pi)
+            }
             ACTION_BOOKMARK -> addBookmark()
             ACTION_STOP -> stopSelf()
             else -> {
