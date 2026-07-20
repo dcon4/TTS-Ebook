@@ -15,10 +15,12 @@ object DebugLogger {
     var verboseEnabled = true
 
     fun init(context: Context) {
-        val dateStr = SimpleDateFormat("yyyy-MM-dd-HH-mm", Locale.US).format(Date())
+        val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
         val file = File(context.filesDir, "ttsebook-debug.log.$dateStr.txt")
         logFile = file
         writer = FileWriter(file, true)
+        writer?.write("===== Session start =====\n")
+        writer?.flush()
         verbose("DebugLogger", "Logger initialized (build ${BuildConfig.VERSION_CODE})")
     }
 

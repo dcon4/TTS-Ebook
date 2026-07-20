@@ -46,6 +46,7 @@ fun LibraryScreen(
 
     var showDebugDialog by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy", Locale.US) }
 
@@ -59,7 +60,10 @@ fun LibraryScreen(
         importResult?.let { result ->
             result.onSuccess { ebook ->
                 onBookSelected(ebook.id)
+            }.onFailure { error ->
+                snackbarHostState.showSnackbar("Import failed: ${error.message ?: "Unknown error"}")
             }
+            viewModel.clearImportResult()
         }
     }
 
@@ -119,6 +123,7 @@ fun LibraryScreen(
             }
         }
     ) { padding ->
+        SnackbarHost(hostState = snackbarHostState, modifier = Modifier.padding(padding))
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             if (isImporting) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))

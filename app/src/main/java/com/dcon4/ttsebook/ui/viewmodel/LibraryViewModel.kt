@@ -66,6 +66,10 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
+    fun clearImportResult() {
+        _importResult.value = null
+    }
+
     fun toggleFavorite(bookId: String) {
         viewModelScope.launch {
             bookRepository.toggleFavorite(bookId)

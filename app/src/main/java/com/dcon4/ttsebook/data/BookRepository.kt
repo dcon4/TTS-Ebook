@@ -9,6 +9,7 @@ import com.dcon4.ttsebook.parser.PdfParser
 import com.dcon4.ttsebook.parser.TxtParser
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import java.io.ByteArrayInputStream
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -46,17 +47,16 @@ class BookRepository @Inject constructor(
         return try {
             val inputStream = context.contentResolver.openInputStream(uri)
                 ?: return Result.failure(Exception("Cannot open file"))
+            val bytes = inputStream.readBytes()
+            inputStream.close()
             val path = uri.path ?: uri.toString()
             val format = detectFormat(path)
             val parser = parsers.find { it.supportsFormat(format) }
                 ?: return Result.failure(Exception("Unsupported format: $format"))
-            val ebook = parser.parse(inputStream, path)
-            inputStream.close()
+            val ebook = parser.parse(ByteArrayInputStream(bytes), path)
             val internalFile = File(context.filesDir, "books/${ebook.id}.$format")
             internalFile.parentFile?.mkdirs()
-            context.contentResolver.openInputStream(uri)?.use { src ->
-                internalFile.outputStream().use { dst -> src.copyTo(dst) }
-            }
+            internalFile.outputStream().use { it.write(bytes) }
             val existing = bookDao.getBook(ebook.id)
             if (existing == null) {
                 bookDao.upsertBook(
