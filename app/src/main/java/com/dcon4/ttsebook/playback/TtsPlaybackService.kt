@@ -356,7 +356,12 @@ class TtsPlaybackService : Service() {
         val pattern = Regex("book_.+_ch(\\d+)_p(\\d+)_chunk_(\\d+)")
         val match = pattern.find(utteranceId)
         if (match != null) {
+            val chapIndex = match.groupValues[1].toIntOrNull() ?: -1
+            val paraIndex = match.groupValues[2].toIntOrNull() ?: -1
             val chunkIndex = match.groupValues[3].toIntOrNull() ?: 0
+            if (chapIndex != currentChapterIndex || paraIndex != currentParagraphIndex) {
+                return
+            }
             val chunkCount = ttsManager.chunkText(paragraphs.getOrElse(currentParagraphIndex) { "" }).size
             if (chunkIndex >= chunkCount - 1) {
                 autoAdvance()
