@@ -345,11 +345,11 @@ class TtsPlaybackService : Service() {
     private fun loadChapterParagraphs() {
         paragraphs = if (chapters.isNotEmpty() && currentChapterIndex in chapters.indices) {
             val chapter = chapters[currentChapterIndex]
-            ttsManager.splitParagraphs(chapter.content)
+            ttsManager.splitSentences(chapter.content)
         } else {
             emptyList()
         }
-        DebugLogger.log(TAG, "Loaded chapter $currentChapterIndex: ${paragraphs.size} paragraphs")
+        DebugLogger.log(TAG, "Loaded chapter $currentChapterIndex: ${paragraphs.size} sentences")
     }
 
     private fun handleUtteranceDone(utteranceId: String) {

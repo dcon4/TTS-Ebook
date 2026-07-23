@@ -66,7 +66,7 @@ class ReaderViewModel @Inject constructor(
 
     private fun computeParagraphs(book: EbookBook?, chapterIndex: Int): List<String> {
         val chapter = book?.chapters?.getOrNull(chapterIndex) ?: return emptyList()
-        return chapter.content.split(Regex("\\n\\s*\\n"))
+        return chapter.content.split(Regex("(?<=[.!?])\\s+"))
             .map { it.trim() }
             .filter { it.isNotBlank() }
     }
@@ -248,7 +248,7 @@ class ReaderViewModel @Inject constructor(
     fun getCurrentParagraphs(): List<String> {
         val book = _currentBook.value ?: return emptyList()
         val chapter = book.chapters.getOrNull(_currentChapterIndex.value) ?: return emptyList()
-        return chapter.content.split(Regex("\\n\\s*\\n"))
+        return chapter.content.split(Regex("(?<=[.!?])\\s+"))
             .map { it.trim() }
             .filter { it.isNotBlank() }
     }

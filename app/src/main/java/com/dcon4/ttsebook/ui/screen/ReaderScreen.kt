@@ -187,7 +187,7 @@ fun ReaderScreen(
                         }
                     }
                     Text(
-                        text = "Chapter ${currentChapterIndex + 1} Paragraph ${currentParagraphIndex + 1}/$paragraphCount",
+                        text = "Chapter ${currentChapterIndex + 1} Sentence ${currentParagraphIndex + 1}/$paragraphCount",
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center
