@@ -30,6 +30,7 @@ class SettingsViewModel @Inject constructor(
     companion object {
         private const val PREFS_NAME = "ttsebook_settings"
         private const val KEY_VERBOSE_LOGGING = "verbose_logging"
+        private const val KEY_MEDIA_SESSION_ENABLED = "media_session_enabled"
     }
 
     private val prefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -53,6 +54,11 @@ class SettingsViewModel @Inject constructor(
         prefs.getBoolean(KEY_VERBOSE_LOGGING, true)
     )
     val verboseEnabled: StateFlow<Boolean> = _verboseEnabled.asStateFlow()
+
+    private val _mediaSessionEnabled = MutableStateFlow(
+        prefs.getBoolean(KEY_MEDIA_SESSION_ENABLED, true)
+    )
+    val mediaSessionEnabled: StateFlow<Boolean> = _mediaSessionEnabled.asStateFlow()
 
     init {
         loadTtsSettings()
@@ -91,6 +97,13 @@ class SettingsViewModel @Inject constructor(
     fun setSpeechRate(rate: Float) {
         _speechRate.value = rate
         ttsManager.setSpeechRate(rate)
+    }
+
+    fun toggleMediaSessionEnabled() {
+        val newValue = !_mediaSessionEnabled.value
+        _mediaSessionEnabled.value = newValue
+        prefs.edit().putBoolean(KEY_MEDIA_SESSION_ENABLED, newValue).apply()
+        DebugLogger.verbose("SettingsViewModel", "Media session toggled to $newValue")
     }
 
     fun toggleVerboseLogging() {

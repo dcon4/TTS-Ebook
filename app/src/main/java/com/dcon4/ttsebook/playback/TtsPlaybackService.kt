@@ -550,11 +550,15 @@ class TtsPlaybackService : Service() {
         )
     }
 
+    private val mediaSessionAllowed: Boolean
+        get() = getSharedPreferences("ttsebook_settings", Context.MODE_PRIVATE)
+            .getBoolean("media_session_enabled", true)
+
     private inner class MediaSessionCallback : MediaSessionCompat.Callback() {
-        override fun onPlay() { resume() }
-        override fun onPause() { pause() }
-        override fun onSkipToNext() { nextParagraph() }
-        override fun onSkipToPrevious() { prevParagraph() }
-        override fun onStop() { pause() }
+        override fun onPlay() { if (mediaSessionAllowed) resume() }
+        override fun onPause() { if (mediaSessionAllowed) pause() }
+        override fun onSkipToNext() { if (mediaSessionAllowed) nextParagraph() }
+        override fun onSkipToPrevious() { if (mediaSessionAllowed) prevParagraph() }
+        override fun onStop() { if (mediaSessionAllowed) pause() }
     }
 }
