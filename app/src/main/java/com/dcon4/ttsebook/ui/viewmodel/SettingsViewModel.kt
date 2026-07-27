@@ -103,6 +103,11 @@ class SettingsViewModel @Inject constructor(
         val newValue = !_mediaSessionEnabled.value
         _mediaSessionEnabled.value = newValue
         prefs.edit().putBoolean(KEY_MEDIA_SESSION_ENABLED, newValue).apply()
+        val intent = android.content.Intent(
+            getApplication(),
+            com.dcon4.ttsebook.playback.TtsPlaybackService::class.java
+        ).setAction(com.dcon4.ttsebook.playback.TtsPlaybackService.ACTION_UPDATE_SETTINGS)
+        getApplication<android.app.Application>().startService(intent)
         DebugLogger.verbose("SettingsViewModel", "Media session toggled to $newValue")
     }
 

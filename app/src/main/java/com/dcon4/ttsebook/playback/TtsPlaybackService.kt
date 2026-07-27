@@ -44,6 +44,7 @@ class TtsPlaybackService : Service() {
         const val ACTION_NEXT_CHAPTER = "com.dcon4.ttsebook.action.NEXT_CHAPTER"
         const val ACTION_PREV_CHAPTER = "com.dcon4.ttsebook.action.PREV_CHAPTER"
         const val ACTION_JUMP_TO = "com.dcon4.ttsebook.action.JUMP_TO"
+        const val ACTION_UPDATE_SETTINGS = "com.dcon4.ttsebook.action.UPDATE_SETTINGS"
         const val ACTION_BOOKMARK = "com.dcon4.ttsebook.action.BOOKMARK"
         const val ACTION_STOP = "com.dcon4.ttsebook.action.STOP"
         const val ACTION_POSITION_CHANGED = "com.dcon4.ttsebook.action.POSITION_CHANGED"
@@ -104,12 +105,8 @@ class TtsPlaybackService : Service() {
         createNotificationChannel()
         mediaSession = MediaSessionCompat(this, TAG).apply {
             setCallback(MediaSessionCallback())
-            setFlags(
-                MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
-                        MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
-            )
-            isActive = true
         }
+        applyMediaSessionConfig()
         ttsManager.onUtteranceDone = { utteranceId ->
             handleUtteranceDone(utteranceId)
         }
@@ -175,6 +172,10 @@ class TtsPlaybackService : Service() {
                 val ci = intent?.getIntExtra(EXTRA_CHAPTER_INDEX, 0) ?: 0
                 val pi = intent?.getIntExtra(EXTRA_PARAGRAPH_INDEX, 0) ?: 0
                 jumpTo(ci, pi)
+            }
+            ACTION_UPDATE_SETTINGS -> {
+                applyMediaSessionConfig()
+                if (mediaSession.isActive) updateMediaSession()
             }
             ACTION_BOOKMARK -> addBookmark()
             ACTION_STOP -> stopSelf()
@@ -526,6 +527,19 @@ class TtsPlaybackService : Service() {
     }
 
     private fun updateMediaSession() {
+        val enabled = getSharedPreferences("ttsebook_settings", Context.MODE_PRIVATE)
+            .getBoolean("media_session_enabled", true)
+        if (!enabled) {
+            mediaSession.setPlaybackState(
+                PlaybackStateCompat.Builder()
+                    .setState(PlaybackStateCompat.STATE_NONE, 0L, 0f)
+                    .setActions(0)
+                    .build()
+            )
+            applyMediaSessionConfig()
+            return
+        }
+        applyMediaSessionConfig()
         val chapterTitle = chapters.getOrNull(currentChapterIndex)?.title ?: ""
         mediaSession.setMetadata(
             MediaMetadataCompat.Builder()
@@ -550,15 +564,26 @@ class TtsPlaybackService : Service() {
         )
     }
 
-    private val mediaSessionAllowed: Boolean
-        get() = getSharedPreferences("ttsebook_settings", Context.MODE_PRIVATE)
+    private fun applyMediaSessionConfig() {
+        val enabled = getSharedPreferences("ttsebook_settings", Context.MODE_PRIVATE)
             .getBoolean("media_session_enabled", true)
+        if (enabled) {
+            mediaSession.isActive = true
+            mediaSession.setFlags(
+                MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
+                        MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
+            )
+        } else {
+            mediaSession.isActive = false
+            mediaSession.setFlags(0)
+        }
+    }
 
     private inner class MediaSessionCallback : MediaSessionCompat.Callback() {
-        override fun onPlay() { if (mediaSessionAllowed) resume() }
-        override fun onPause() { if (mediaSessionAllowed) pause() }
-        override fun onSkipToNext() { if (mediaSessionAllowed) nextParagraph() }
-        override fun onSkipToPrevious() { if (mediaSessionAllowed) prevParagraph() }
-        override fun onStop() { if (mediaSessionAllowed) pause() }
+        override fun onPlay() { resume() }
+        override fun onPause() { pause() }
+        override fun onSkipToNext() { nextParagraph() }
+        override fun onSkipToPrevious() { prevParagraph() }
+        override fun onStop() { pause() }
     }
 }
