@@ -1,11 +1,9 @@
 package com.dcon4.ttsebook
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,13 +13,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.lifecycleScope
-import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.dcon4.ttsebook.data.BookRepository
 import com.dcon4.ttsebook.debug.DebugLogger
 import com.dcon4.ttsebook.ui.screen.LibraryScreen
 import com.dcon4.ttsebook.ui.screen.ReaderScreen
@@ -29,11 +25,6 @@ import com.dcon4.ttsebook.ui.screen.SearchScreen
 import com.dcon4.ttsebook.ui.screen.SettingsScreen
 import com.dcon4.ttsebook.ui.theme.TtsEbookTheme
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -41,10 +32,6 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val TAG = "MainActivity"
     }
-
-    @Inject lateinit var bookRepository: BookRepository
-
-    private val navController by lazy { NavHostController(this) }
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -57,40 +44,7 @@ class MainActivity : ComponentActivity() {
         requestNotificationPermission()
         setContent {
             TtsEbookTheme {
-                TtsEbookNavHost(navController)
-            }
-        }
-        handleOpenIntent(intent)
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        handleOpenIntent(intent)
-    }
-
-    private fun handleOpenIntent(intent: Intent?) {
-        if (intent?.action != Intent.ACTION_VIEW) return
-        val uri = intent.data ?: return
-        DebugLogger.log(TAG, "Open intent: $uri")
-        lifecycleScope.launch {
-            try {
-                while (navController.currentDestination == null) {
-                    delay(50)
-                }
-            } catch (_: Exception) {}
-            val result = withContext(Dispatchers.IO) {
-                bookRepository.importBook(uri)
-            }
-            result.onSuccess { book ->
-                navController.navigate("reader/${book.id}")
-            }.onFailure { e ->
-                DebugLogger.logException(TAG, "Open intent import failed", e)
-                Toast.makeText(
-                    this@MainActivity,
-                    "Could not open file: ${e.message ?: "Unknown error"}",
-                    Toast.LENGTH_LONG
-                ).show()
+                TtsEbookNavHost()
             }
         }
     }
@@ -108,7 +62,8 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun TtsEbookNavHost(navController: NavHostController) {
+fun TtsEbookNavHost() {
+    val navController = rememberNavController()
     var selectedBookId by remember { mutableStateOf<String?>(null) }
 
     NavHost(navController = navController, startDestination = "library") {
