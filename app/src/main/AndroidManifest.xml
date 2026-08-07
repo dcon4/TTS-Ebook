@@ -24,10 +24,38 @@
         android:theme="@style/Theme.TtsEbook">
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" android:mimeType="application/epub+zip" />
+                <data android:scheme="file" android:mimeType="application/epub+zip" />
+                <data android:scheme="content" android:pathPattern=".*\\.epub" />
+                <data android:scheme="file" android:pathPattern=".*\\.epub" />
+                <data android:scheme="content" android:mimeType="application/pdf" />
+                <data android:scheme="file" android:mimeType="application/pdf" />
+                <data android:scheme="content" android:pathPattern=".*\\.pdf" />
+                <data android:scheme="file" android:pathPattern=".*\\.pdf" />
+                <data android:scheme="content" android:mimeType="text/plain" />
+                <data android:scheme="file" android:mimeType="text/plain" />
+                <data android:scheme="content" android:pathPattern=".*\\.txt" />
+                <data android:scheme="file" android:pathPattern=".*\\.txt" />
+                <data android:scheme="content" android:mimeType="text/html" />
+                <data android:scheme="file" android:mimeType="text/html" />
+                <data android:scheme="content" android:mimeType="application/xhtml+xml" />
+                <data android:scheme="file" android:mimeType="application/xhtml+xml" />
+                <data android:scheme="content" android:pathPattern=".*\\.html" />
+                <data android:scheme="file" android:pathPattern=".*\\.html" />
+                <data android:scheme="content" android:pathPattern=".*\\.htm" />
+                <data android:scheme="file" android:pathPattern=".*\\.htm" />
+                <data android:scheme="content" android:pathPattern=".*\\.xhtml" />
+                <data android:scheme="file" android:pathPattern=".*\\.xhtml" />
             </intent-filter>
         </activity>
 

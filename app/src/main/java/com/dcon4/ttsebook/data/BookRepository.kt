@@ -50,7 +50,10 @@ class BookRepository @Inject constructor(
             val bytes = inputStream.readBytes()
             inputStream.close()
             val path = uri.path ?: uri.toString()
-            val format = detectFormat(path)
+            var format = detectFormat(path)
+            if (!parsers.any { it.supportsFormat(format) }) {
+                format = detectFormatFromMime(context.contentResolver.getType(uri)) ?: format
+            }
             val parser = parsers.find { it.supportsFormat(format) }
                 ?: return Result.failure(Exception("Unsupported format: $format"))
             val ebook = parser.parse(ByteArrayInputStream(bytes), path)
@@ -152,6 +155,16 @@ class BookRepository @Inject constructor(
             "txt" -> "txt"
             "html", "htm", "mhtml", "xhtml" -> "html"
             else -> ext
+        }
+    }
+
+    private fun detectFormatFromMime(mimeType: String?): String? {
+        return when (mimeType?.lowercase()?.trim()) {
+            "application/epub+zip" -> "epub"
+            "application/pdf" -> "pdf"
+            "text/plain" -> "txt"
+            "text/html", "application/xhtml+xml" -> "html"
+            else -> null
         }
     }
 }
