@@ -1,14 +1,19 @@
 package com.dcon4.ttsebook.data
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import com.dcon4.ttsebook.debug.DebugLogger
 import com.dcon4.ttsebook.parser.EpubParser
 import com.dcon4.ttsebook.parser.HtmlParser
 import com.dcon4.ttsebook.parser.PdfParser
 import com.dcon4.ttsebook.parser.TxtParser
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.rendering.PDFRenderer
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
 import java.io.File
 import javax.inject.Inject
@@ -86,6 +91,26 @@ class BookRepository @Inject constructor(
     suspend fun removeBook(bookId: String) {
         bookDao.deleteBook(bookId)
         positionDao.deletePosition(bookId)
+    }
+
+    suspend fun renderPdfPage(filePath: String, pageNumber: Int, scale: Float): Bitmap? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val file = File(filePath)
+                if (!file.exists()) return@withContext null
+                val doc = PDDocument.load(file)
+                try {
+                    if (pageNumber < 1 || pageNumber > doc.numberOfPages) return@withContext null
+                    val renderer = PDFRenderer(doc)
+                    renderer.renderImage(pageNumber - 1, scale)
+                } finally {
+                    doc.close()
+                }
+            } catch (e: Throwable) {
+                DebugLogger.logException(TAG, "renderPdfPage failed page=$pageNumber", e)
+                null
+            }
+        }
     }
 
     suspend fun toggleFavorite(bookId: String) {

@@ -7,6 +7,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Build
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
@@ -27,6 +29,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+data class ChapterImageUi(
+    val anchorParagraphIndex: Int,
+    val bitmap: Bitmap,
+    val label: String
+)
+
 @HiltViewModel
 class ReaderViewModel @Inject constructor(
     application: Application,
@@ -35,6 +43,11 @@ class ReaderViewModel @Inject constructor(
 
     companion object {
         private const val TAG = "ReaderViewModel"
+        private const val PREFS_NAME = "ttsebook_settings"
+        private const val KEY_SHOW_PDF_PAGES = "show_pdf_pages"
+        private const val KEY_SHOW_EMBEDDED_IMAGES = "show_embedded_images"
+        private const val PDF_RENDER_SCALE = 1.5f
+        private const val PDF_PAGE_CACHE_SIZE = 3
     }
 
     private val _currentBook = MutableStateFlow<EbookBook?>(null)
@@ -61,6 +74,23 @@ class ReaderViewModel @Inject constructor(
     private val _chapters = MutableStateFlow<List<EbookChapter>>(emptyList())
     val chapters: StateFlow<List<EbookChapter>> = _chapters.asStateFlow()
 
+    private val _bookFormat = MutableStateFlow<String?>(null)
+    val bookFormat: StateFlow<String?> = _bookFormat.asStateFlow()
+
+    private val _pdfPageNumber = MutableStateFlow(0)
+    val pdfPageNumber: StateFlow<Int> = _pdfPageNumber.asStateFlow()
+
+    private val _pdfPageBitmap = MutableStateFlow<Bitmap?>(null)
+    val pdfPageBitmap: StateFlow<Bitmap?> = _pdfPageBitmap.asStateFlow()
+
+    private val _chapterImages = MutableStateFlow<List<ChapterImageUi>>(emptyList())
+    val chapterImages: StateFlow<List<ChapterImageUi>> = _chapterImages.asStateFlow()
+
+    private var showPdfPages = true
+    private var showEmbeddedImages = true
+    private var lastHandledChapter = -1
+    private val pdfPageCache = LinkedHashMap<Int, Bitmap>()
+
     var bookEntity: BookEntity? = null
         private set
 
@@ -78,6 +108,66 @@ class ReaderViewModel @Inject constructor(
             val list = computeParagraphs(book, ci)
             _paragraphs.value = list
             _paragraphCount.value = list.size
+        }
+        handleChapterDisplay(ci)
+    }
+
+    private fun handleChapterDisplay(chapterIndex: Int) {
+        if (chapterIndex == lastHandledChapter) return
+        lastHandledChapter = chapterIndex
+        val book = _currentBook.value ?: return
+        val chapter = book.chapters.getOrNull(chapterIndex) ?: return
+        if (_bookFormat.value == "pdf") {
+            _chapterImages.value = emptyList()
+            val pageNumber = chapter.pageNumber ?: return
+            _pdfPageNumber.value = pageNumber
+            val cached = pdfPageCache[pageNumber]
+            if (cached != null) {
+                _pdfPageBitmap.value = cached
+                return
+            }
+            _pdfPageBitmap.value = null
+            val filePath = bookEntity?.filePath ?: return
+            viewModelScope.launch {
+                val bmp = if (showPdfPages) {
+                    bookRepository.renderPdfPage(filePath, pageNumber, PDF_RENDER_SCALE)
+                } else {
+                    null
+                }
+                if (bmp != null && _currentChapterIndex.value == chapterIndex) {
+                    pdfPageCache[pageNumber] = bmp
+                    if (pdfPageCache.size > PDF_PAGE_CACHE_SIZE) {
+                        val oldest = pdfPageCache.keys.firstOrNull()
+                        if (oldest != null) pdfPageCache.remove(oldest)
+                    }
+                    _pdfPageBitmap.value = bmp
+                }
+            }
+        } else {
+            _pdfPageBitmap.value = null
+            _pdfPageNumber.value = 0
+            if (!showEmbeddedImages || chapter.images.isEmpty()) {
+                _chapterImages.value = emptyList()
+                return
+            }
+            _chapterImages.value = emptyList()
+            viewModelScope.launch(Dispatchers.Default) {
+                val decoded = chapter.images.mapNotNull { img ->
+                    try {
+                        val bmp = BitmapFactory.decodeByteArray(img.bytes, 0, img.bytes.size)
+                        if (bmp != null) {
+                            ChapterImageUi(img.anchorParagraphIndex, bmp, img.label)
+                        } else {
+                            null
+                        }
+                    } catch (_: Throwable) {
+                        null
+                    }
+                }
+                if (_currentChapterIndex.value == chapterIndex) {
+                    _chapterImages.value = decoded
+                }
+            }
         }
     }
 
@@ -126,6 +216,14 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             DebugLogger.log(TAG, "loadBook: start bookId=$bookId")
             val t0 = System.currentTimeMillis()
+            val prefs = getApplication<Application>()
+                .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            showPdfPages = prefs.getBoolean(KEY_SHOW_PDF_PAGES, true)
+            showEmbeddedImages = prefs.getBoolean(KEY_SHOW_EMBEDDED_IMAGES, true)
+            lastHandledChapter = -1
+            _pdfPageBitmap.value = null
+            _pdfPageNumber.value = 0
+            _chapterImages.value = emptyList()
             try {
                 val entity = bookRepository.getBook(bookId) ?: run {
                     DebugLogger.log(TAG, "loadBook: getBook returned null"); return@launch
@@ -148,6 +246,7 @@ class ReaderViewModel @Inject constructor(
                 DebugLogger.log(TAG, "loadBook: loadBook ${t4-t3}ms chapters=${ebook.chapters.size}")
                 _currentBook.value = ebook
                 _chapters.value = ebook.chapters
+                _bookFormat.value = entity.format
                 if (initialChapterIndex >= 0 && initialParagraphIndex >= 0) {
                     _currentChapterIndex.value = initialChapterIndex
                     _currentParagraphIndex.value = initialParagraphIndex
@@ -163,6 +262,7 @@ class ReaderViewModel @Inject constructor(
                 DebugLogger.log(TAG, "loadBook: computeParagraphs ${t5-t4}ms size=${list.size}")
                 _paragraphs.value = list
                 _paragraphCount.value = list.size
+                handleChapterDisplay(_currentChapterIndex.value)
                 val intent = Intent(getApplication(), TtsPlaybackService::class.java).apply {
                     action = TtsPlaybackService.ACTION_PLAY
                     putExtra("bookId", ebook.id)

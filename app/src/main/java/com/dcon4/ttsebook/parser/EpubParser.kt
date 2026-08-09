@@ -2,10 +2,13 @@ package com.dcon4.ttsebook.parser
 
 import com.dcon4.ttsebook.data.EbookBook
 import com.dcon4.ttsebook.data.EbookChapter
+import com.dcon4.ttsebook.data.EbookImage
 import com.dcon4.ttsebook.data.EbookParser
 import nl.siegmann.epublib.domain.Book
+import nl.siegmann.epublib.domain.Resource
 import nl.siegmann.epublib.epub.EpubReader
 import java.io.InputStream
+import java.net.URI
 import java.security.MessageDigest
 
 class EpubParser : EbookParser {
@@ -20,14 +23,15 @@ class EpubParser : EbookParser {
         for (resource in book.tableOfContents?.tocReferences ?: emptyList()) {
             val href = resource.resource?.href ?: continue
             val chapTitle = resource.title ?: "Chapter ${index + 1}"
-            val content = try {
-                val raw = resource.resource?.inputStream?.bufferedReader()?.readText() ?: ""
-                stripHtml(raw)
+            val raw = try {
+                resource.resource?.inputStream?.bufferedReader()?.readText() ?: ""
             } catch (e: Exception) {
                 ""
             }
+            val images = extractImages(raw, href, book)
+            val content = stripHtml(raw)
             if (content.isNotBlank()) {
-                chapters.add(EbookChapter(index, chapTitle, content))
+                chapters.add(EbookChapter(index, chapTitle, content, images))
                 index++
             }
         }
@@ -54,6 +58,66 @@ class EpubParser : EbookParser {
 
     override fun supportsFormat(format: String): Boolean {
         return format.equals("epub", ignoreCase = true)
+    }
+
+    private fun extractImages(html: String, chapterHref: String, book: Book): List<EbookImage> {
+        val images = mutableListOf<EbookImage>()
+        val imgRegex = Regex("<img[^>]*>", RegexOption.IGNORE_CASE)
+        val srcRegex = Regex("""src\s*=\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+        val altRegex = Regex("""alt\s*=\s*["']([^"']*)["']""", RegexOption.IGNORE_CASE)
+        val blockRegex = Regex("(?i)<(p|div|li|h[1-6]|section|article)[\\s>]")
+        for (match in imgRegex.findAll(html)) {
+            val src = srcRegex.find(match.value)?.groupValues?.get(1) ?: continue
+            val resolved = resolveHref(chapterHref, src)
+            val resource = findResource(book, resolved) ?: continue
+            val bytes = try {
+                resource.data
+            } catch (e: Exception) {
+                try {
+                    resource.inputStream?.readBytes()
+                } catch (e2: Exception) {
+                    null
+                }
+            } ?: continue
+            val anchor = blockRegex.findAll(html.substring(0, match.range.first)).count()
+            val alt = altRegex.find(match.value)?.groupValues?.get(1)?.trim().orEmpty()
+            val label = alt.ifEmpty { src.substringAfterLast('/') }
+            val mime = try {
+                resource.mediaType?.name
+            } catch (e: Exception) {
+                null
+            }
+            images.add(EbookImage(anchor, label, mime, bytes))
+        }
+        return images
+    }
+
+    private fun findResource(book: Book, href: String): Resource? {
+        val candidates = listOf(href, href.removePrefix("/"))
+        for (candidate in candidates) {
+            try {
+                val resource = book.resources.getResourceByHref(candidate)
+                if (resource != null) return resource
+            } catch (_: Exception) {}
+        }
+        val name = href.substringAfterLast('/')
+        if (name.isNotEmpty()) {
+            try {
+                val resource = book.resources.getResourceByHref(name)
+                if (resource != null) return resource
+            } catch (_: Exception) {}
+        }
+        return null
+    }
+
+    private fun resolveHref(base: String, src: String): String {
+        val cleanBase = base.substringBefore('#')
+        return try {
+            URI.create(cleanBase).resolve(src).normalize().toString().removePrefix("/")
+        } catch (_: Exception) {
+            val dir = cleanBase.substringBeforeLast('/', "").let { if (it.isEmpty()) "" else "$it/" }
+            (dir + src).removePrefix("/")
+        }
     }
 
     private fun stripHtml(html: String): String {

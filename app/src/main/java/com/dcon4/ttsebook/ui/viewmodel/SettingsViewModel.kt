@@ -31,6 +31,8 @@ class SettingsViewModel @Inject constructor(
         private const val PREFS_NAME = "ttsebook_settings"
         private const val KEY_VERBOSE_LOGGING = "verbose_logging"
         private const val KEY_MEDIA_SESSION_ENABLED = "media_session_enabled"
+        private const val KEY_SHOW_PDF_PAGES = "show_pdf_pages"
+        private const val KEY_SHOW_EMBEDDED_IMAGES = "show_embedded_images"
     }
 
     private val prefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -59,6 +61,16 @@ class SettingsViewModel @Inject constructor(
         prefs.getBoolean(KEY_MEDIA_SESSION_ENABLED, true)
     )
     val mediaSessionEnabled: StateFlow<Boolean> = _mediaSessionEnabled.asStateFlow()
+
+    private val _showPdfPages = MutableStateFlow(
+        prefs.getBoolean(KEY_SHOW_PDF_PAGES, true)
+    )
+    val showPdfPages: StateFlow<Boolean> = _showPdfPages.asStateFlow()
+
+    private val _showEmbeddedImages = MutableStateFlow(
+        prefs.getBoolean(KEY_SHOW_EMBEDDED_IMAGES, true)
+    )
+    val showEmbeddedImages: StateFlow<Boolean> = _showEmbeddedImages.asStateFlow()
 
     init {
         loadTtsSettings()
@@ -117,6 +129,20 @@ class SettingsViewModel @Inject constructor(
         prefs.edit().putBoolean(KEY_VERBOSE_LOGGING, newValue).apply()
         DebugLogger.verboseEnabled = newValue
         DebugLogger.verbose("SettingsViewModel", "Verbose logging toggled to $newValue")
+    }
+
+    fun toggleShowPdfPages() {
+        val newValue = !_showPdfPages.value
+        _showPdfPages.value = newValue
+        prefs.edit().putBoolean(KEY_SHOW_PDF_PAGES, newValue).apply()
+        DebugLogger.verbose("SettingsViewModel", "Show PDF pages toggled to $newValue")
+    }
+
+    fun toggleShowEmbeddedImages() {
+        val newValue = !_showEmbeddedImages.value
+        _showEmbeddedImages.value = newValue
+        prefs.edit().putBoolean(KEY_SHOW_EMBEDDED_IMAGES, newValue).apply()
+        DebugLogger.verbose("SettingsViewModel", "Show embedded images toggled to $newValue")
     }
 
     fun getShareLogIntent(): Intent? {

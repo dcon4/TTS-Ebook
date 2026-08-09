@@ -1,6 +1,7 @@
 package com.dcon4.ttsebook.ui.screen
 
 import android.content.Intent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -12,6 +13,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -21,10 +24,16 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dcon4.ttsebook.BuildConfig
 import com.dcon4.ttsebook.debug.DebugLogger
+import com.dcon4.ttsebook.ui.viewmodel.ChapterImageUi
 import com.dcon4.ttsebook.ui.viewmodel.ReaderViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+private sealed class ReaderItem {
+    data class Paragraph(val text: String, val sentenceIndex: Int) : ReaderItem()
+    data class Picture(val image: ChapterImageUi) : ReaderItem()
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,19 +54,40 @@ fun ReaderScreen(
     val paragraphs by viewModel.paragraphs.collectAsState()
     val paragraphCount by viewModel.paragraphCount.collectAsState()
     val chapters by viewModel.chapters.collectAsState()
+    val bookFormat by viewModel.bookFormat.collectAsState()
+    val pdfPageNumber by viewModel.pdfPageNumber.collectAsState()
+    val pdfPageBitmap by viewModel.pdfPageBitmap.collectAsState()
+    val chapterImages by viewModel.chapterImages.collectAsState()
     val listState = rememberLazyListState()
     val context = LocalContext.current
 
     var showDebugDialog by remember { mutableStateOf(false) }
     var showChapterDialog by remember { mutableStateOf(false) }
 
+    val items = remember(paragraphs, chapterImages) {
+        val list = mutableListOf<ReaderItem>()
+        paragraphs.forEachIndexed { index, text ->
+            chapterImages.filter { it.anchorParagraphIndex == index }.forEach {
+                list.add(ReaderItem.Picture(it))
+            }
+            list.add(ReaderItem.Paragraph(text, index))
+        }
+        chapterImages.filter { it.anchorParagraphIndex >= paragraphs.size }.forEach {
+            list.add(ReaderItem.Picture(it))
+        }
+        list
+    }
+
     LaunchedEffect(bookId) {
         viewModel.loadBook(bookId, initialChapterIndex, initialParagraphIndex)
     }
 
-    LaunchedEffect(currentParagraphIndex, paragraphs) {
-        if (currentParagraphIndex in paragraphs.indices) {
-            listState.animateScrollToItem(currentParagraphIndex)
+    LaunchedEffect(currentParagraphIndex, items) {
+        val target = items.indexOfFirst {
+            it is ReaderItem.Paragraph && it.sentenceIndex == currentParagraphIndex
+        }
+        if (target >= 0) {
+            listState.animateScrollToItem(target)
         }
     }
 
@@ -196,37 +226,70 @@ fun ReaderScreen(
             }
         }
     ) { padding ->
-        if (paragraphs.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("No content available", style = MaterialTheme.typography.bodyLarge)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            if (bookFormat == "pdf" && pdfPageBitmap != null) {
+                Image(
+                    bitmap = pdfPageBitmap.asImageBitmap(),
+                    contentDescription = "PDF page $pdfPageNumber",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 320.dp)
+                        .semantics { contentDescription = "PDF page $pdfPageNumber" },
+                    contentScale = ContentScale.FitWidth
+                )
             }
-        } else {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                itemsIndexed(paragraphs) { index, paragraph ->
-                    Surface(
-                        color = if (index == currentParagraphIndex)
-                            MaterialTheme.colorScheme.primaryContainer
-                        else Color.Transparent,
-                        shape = MaterialTheme.shapes.small,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = paragraph,
-                            modifier = Modifier.padding(12.dp),
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                lineHeight = 28.sp
+            if (paragraphs.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No content available", style = MaterialTheme.typography.bodyLarge)
+                }
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    itemsIndexed(items) { index, item ->
+                        when (item) {
+                            is ReaderItem.Picture -> Image(
+                                bitmap = item.image.bitmap.asImageBitmap(),
+                                contentDescription = item.image.label.ifBlank { "Picture" },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp)
+                                    .semantics {
+                                        contentDescription =
+                                            "Picture: ${item.image.label.ifBlank { "unnamed" }}"
+                                    },
+                                contentScale = ContentScale.FitWidth
                             )
-                        )
+                            is ReaderItem.Paragraph -> Surface(
+                                color = if (item.sentenceIndex == currentParagraphIndex)
+                                    MaterialTheme.colorScheme.primaryContainer
+                                else Color.Transparent,
+                                shape = MaterialTheme.shapes.small,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = item.text,
+                                    modifier = Modifier.padding(12.dp),
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        lineHeight = 28.sp
+                                    )
+                                )
+                            }
+                        }
                     }
                 }
             }

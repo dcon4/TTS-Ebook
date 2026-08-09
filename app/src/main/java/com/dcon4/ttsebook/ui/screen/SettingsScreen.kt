@@ -31,6 +31,8 @@ fun SettingsScreen(
     val speechRate by viewModel.speechRate.collectAsState()
     val verboseEnabled by viewModel.verboseEnabled.collectAsState()
     val mediaSessionEnabled by viewModel.mediaSessionEnabled.collectAsState()
+    val showPdfPages by viewModel.showPdfPages.collectAsState()
+    val showEmbeddedImages by viewModel.showEmbeddedImages.collectAsState()
 
     var showDebugDialog by remember { mutableStateOf(false) }
     var showEngineDialog by remember { mutableStateOf(false) }
@@ -144,6 +146,67 @@ fun SettingsScreen(
                             onCheckedChange = { viewModel.toggleMediaSessionEnabled() },
                             modifier = Modifier.semantics {
                                 contentDescription = "Toggle Bluetooth media controls"
+                            }
+                        )
+                    }
+                }
+            }
+
+            item {
+                Spacer(Modifier.height(16.dp))
+                Text("Display", style = MaterialTheme.typography.titleMedium)
+            }
+
+            item {
+                OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Show PDF pages", style = MaterialTheme.typography.labelLarge)
+                            Text(
+                                text = if (showPdfPages) "Enabled" else "Disabled",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = showPdfPages,
+                            onCheckedChange = { viewModel.toggleShowPdfPages() },
+                            modifier = Modifier.semantics {
+                                contentDescription = "Toggle PDF page display"
+                            }
+                        )
+                    }
+                }
+            }
+
+            item {
+                OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Show embedded pictures", style = MaterialTheme.typography.labelLarge)
+                            Text(
+                                text = if (showEmbeddedImages) "Enabled" else "Disabled",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = showEmbeddedImages,
+                            onCheckedChange = { viewModel.toggleShowEmbeddedImages() },
+                            modifier = Modifier.semantics {
+                                contentDescription = "Toggle embedded picture display"
                             }
                         )
                     }

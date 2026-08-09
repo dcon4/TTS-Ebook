@@ -2,10 +2,19 @@ package com.dcon4.ttsebook.data
 
 import java.io.InputStream
 
+data class EbookImage(
+    val anchorParagraphIndex: Int,
+    val label: String,
+    val mimeType: String?,
+    val bytes: ByteArray
+)
+
 data class EbookChapter(
     val index: Int,
     val title: String,
-    val content: String
+    val content: String,
+    val images: List<EbookImage> = emptyList(),
+    val pageNumber: Int? = null
 )
 
 data class EbookBook(
