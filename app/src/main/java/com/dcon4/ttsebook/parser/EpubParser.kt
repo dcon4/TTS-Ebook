@@ -66,15 +66,10 @@ class EpubParser : EbookParser {
         val lazyTypes = listOf(
             MediatypeService.GIF, MediatypeService.JPG, MediatypeService.PNG, MediatypeService.SVG
         )
-        try {
-            val zipFile = net.sf.jazzlib.ZipFile(file)
-            try {
-                return EpubReader().readEpubLazy(zipFile, "UTF-8", lazyTypes)
-            } finally {
-                zipFile.close()
-            }
+        return try {
+            EpubReader().readEpubLazy(file.absolutePath, "UTF-8", lazyTypes)
         } catch (_: Exception) {
-            FileInputStream(file).use { return EpubReader().readEpub(it) }
+            FileInputStream(file).use { EpubReader().readEpub(it) }
         }
     }
 
