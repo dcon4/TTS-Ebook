@@ -151,14 +151,22 @@ class ReaderViewModel @Inject constructor(
                 return
             }
             _chapterImages.value = emptyList()
-            viewModelScope.launch(Dispatchers.Default) {
+            viewModelScope.launch {
+                val filePath = bookEntity?.filePath ?: return@launch
                 val decoded = chapter.images.mapNotNull { img ->
                     try {
-                        val bmp = BitmapFactory.decodeByteArray(img.bytes, 0, img.bytes.size)
-                        if (bmp != null) {
-                            ChapterImageUi(img.anchorParagraphIndex, bmp, img.label)
-                        } else {
+                        val bytes = bookRepository.loadEpubImageBytes(filePath, img.href)
+                        if (bytes == null) {
                             null
+                        } else {
+                            val bmp = withContext(Dispatchers.Default) {
+                                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                            }
+                            if (bmp != null) {
+                                ChapterImageUi(img.anchorParagraphIndex, bmp, img.label)
+                            } else {
+                                null
+                            }
                         }
                     } catch (_: Throwable) {
                         null

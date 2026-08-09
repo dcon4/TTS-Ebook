@@ -7,14 +7,16 @@ import com.dcon4.ttsebook.data.EbookParser
 import nl.siegmann.epublib.domain.Book
 import nl.siegmann.epublib.domain.Resource
 import nl.siegmann.epublib.epub.EpubReader
-import java.io.InputStream
+import nl.siegmann.epublib.service.MediatypeService
+import java.io.File
+import java.io.FileInputStream
 import java.net.URI
 import java.security.MessageDigest
 
 class EpubParser : EbookParser {
-    override fun parse(inputStream: InputStream, filePath: String): EbookBook {
-        val book = EpubReader().readEpub(inputStream)
-        val title = book.title ?: filePath.substringAfterLast('/').removeSuffix(".epub")
+    override fun parse(file: File, displayPath: String): EbookBook {
+        val book = readBook(file)
+        val title = book.title ?: displayPath.substringAfterLast('/').removeSuffix(".epub")
         val author = book.metadata.authors.firstOrNull()?.let {
             "${it.firstname} ${it.lastname}"
         }?.trim() ?: "Unknown"
@@ -60,6 +62,22 @@ class EpubParser : EbookParser {
         return format.equals("epub", ignoreCase = true)
     }
 
+    private fun readBook(file: File): Book {
+        val lazyTypes = listOf(
+            MediatypeService.GIF, MediatypeService.JPG, MediatypeService.PNG, MediatypeService.SVG
+        )
+        try {
+            val zipFile = net.sf.jazzlib.ZipFile(file)
+            try {
+                return EpubReader().readEpubLazy(zipFile, "UTF-8", lazyTypes)
+            } finally {
+                zipFile.close()
+            }
+        } catch (_: Exception) {
+            FileInputStream(file).use { return EpubReader().readEpub(it) }
+        }
+    }
+
     private fun extractImages(html: String, chapterHref: String, book: Book): List<EbookImage> {
         val images = mutableListOf<EbookImage>()
         val imgRegex = Regex("<img[^>]*>", RegexOption.IGNORE_CASE)
@@ -70,15 +88,6 @@ class EpubParser : EbookParser {
             val src = srcRegex.find(match.value)?.groupValues?.get(1) ?: continue
             val resolved = resolveHref(chapterHref, src)
             val resource = findResource(book, resolved) ?: continue
-            val bytes = try {
-                resource.data
-            } catch (e: Exception) {
-                try {
-                    resource.inputStream?.readBytes()
-                } catch (e2: Exception) {
-                    null
-                }
-            } ?: continue
             val anchor = blockRegex.findAll(html.substring(0, match.range.first)).count()
             val alt = altRegex.find(match.value)?.groupValues?.get(1)?.trim().orEmpty()
             val label = alt.ifEmpty { src.substringAfterLast('/') }
@@ -87,7 +96,7 @@ class EpubParser : EbookParser {
             } catch (e: Exception) {
                 null
             }
-            images.add(EbookImage(anchor, label, mime, bytes))
+            images.add(EbookImage(anchor, label, mime, resource.href ?: resolved))
         }
         return images
     }

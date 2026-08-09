@@ -1,12 +1,12 @@
 package com.dcon4.ttsebook.data
 
-import java.io.InputStream
+import java.io.File
 
 data class EbookImage(
     val anchorParagraphIndex: Int,
     val label: String,
     val mimeType: String?,
-    val bytes: ByteArray
+    val href: String
 )
 
 data class EbookChapter(
@@ -26,6 +26,6 @@ data class EbookBook(
 )
 
 interface EbookParser {
-    fun parse(inputStream: InputStream, filePath: String): EbookBook
+    fun parse(file: File, displayPath: String): EbookBook
     fun supportsFormat(format: String): Boolean
 }

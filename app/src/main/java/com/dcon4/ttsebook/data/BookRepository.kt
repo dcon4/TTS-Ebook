@@ -14,7 +14,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayInputStream
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -50,10 +49,6 @@ class BookRepository @Inject constructor(
 
     suspend fun importBook(uri: Uri): Result<EbookBook> {
         return try {
-            val inputStream = context.contentResolver.openInputStream(uri)
-                ?: return Result.failure(Exception("Cannot open file"))
-            val bytes = inputStream.readBytes()
-            inputStream.close()
             val path = uri.path ?: uri.toString()
             var format = detectFormat(path)
             if (!parsers.any { it.supportsFormat(format) }) {
@@ -61,27 +56,52 @@ class BookRepository @Inject constructor(
             }
             val parser = parsers.find { it.supportsFormat(format) }
                 ?: return Result.failure(Exception("Unsupported format: $format"))
-            val ebook = parser.parse(ByteArrayInputStream(bytes), path)
-            val internalFile = File(context.filesDir, "books/${ebook.id}.$format")
-            internalFile.parentFile?.mkdirs()
-            internalFile.outputStream().use { it.write(bytes) }
-            val existing = bookDao.getBook(ebook.id)
-            if (existing == null) {
-                bookDao.upsertBook(
-                    BookEntity(
-                        id = ebook.id,
-                        title = ebook.title,
-                        author = ebook.author,
-                        filePath = internalFile.absolutePath,
-                        contentHash = ebook.contentHash,
-                        format = format,
-                        lastOpenedAt = System.currentTimeMillis()
+            val booksDir = File(context.filesDir, "books")
+            booksDir.mkdirs()
+            val tmpFile = File(booksDir, "import-${System.currentTimeMillis()}.tmp")
+            try {
+                val input = context.contentResolver.openInputStream(uri)
+                    ?: return Result.failure(Exception("Cannot open file"))
+                input.use { inp ->
+                    tmpFile.outputStream().use { out ->
+                        val buffer = ByteArray(64 * 1024)
+                        while (true) {
+                            val n = inp.read(buffer)
+                            if (n < 0) break
+                            out.write(buffer, 0, n)
+                        }
+                    }
+                }
+                val ebook = parser.parse(tmpFile, path)
+                val internalFile = File(booksDir, "${ebook.id}.$format")
+                if (internalFile.exists()) {
+                    tmpFile.delete()
+                } else {
+                    if (!tmpFile.renameTo(internalFile)) {
+                        tmpFile.copyTo(internalFile, overwrite = true)
+                        tmpFile.delete()
+                    }
+                }
+                val existing = bookDao.getBook(ebook.id)
+                if (existing == null) {
+                    bookDao.upsertBook(
+                        BookEntity(
+                            id = ebook.id,
+                            title = ebook.title,
+                            author = ebook.author,
+                            filePath = internalFile.absolutePath,
+                            contentHash = ebook.contentHash,
+                            format = format,
+                            lastOpenedAt = System.currentTimeMillis()
+                        )
                     )
-                )
-            } else {
-                bookDao.upsertBook(existing.copy(lastOpenedAt = System.currentTimeMillis()))
+                } else {
+                    bookDao.upsertBook(existing.copy(lastOpenedAt = System.currentTimeMillis()))
+                }
+                Result.success(ebook)
+            } finally {
+                if (tmpFile.exists()) tmpFile.delete()
             }
-            Result.success(ebook)
         } catch (e: Exception) {
             DebugLogger.logException(TAG, "Import failed", e)
             Result.failure(e)
@@ -149,26 +169,65 @@ class BookRepository @Inject constructor(
 
     fun loadBook(filePath: String): EbookBook? {
         return try {
+            val format = detectFormat(filePath)
+            val parser = parsers.find { it.supportsFormat(format) } ?: return null
             val file = File(filePath)
             if (file.exists()) {
-                val inputStream = file.inputStream()
-                val format = detectFormat(filePath)
-                val parser = parsers.find { it.supportsFormat(format) } ?: return null
-                val ebook = parser.parse(inputStream, filePath)
-                inputStream.close()
-                ebook
+                parser.parse(file, filePath)
             } else {
                 val uri = Uri.parse(filePath)
-                val inputStream = context.contentResolver.openInputStream(uri) ?: return null
-                val format = detectFormat(filePath)
-                val parser = parsers.find { it.supportsFormat(format) } ?: return null
-                val ebook = parser.parse(inputStream, filePath)
-                inputStream.close()
-                ebook
+                val input = context.contentResolver.openInputStream(uri) ?: return null
+                val tmpFile = File(context.cacheDir, "load-${System.currentTimeMillis()}.$format")
+                try {
+                    input.use { inp ->
+                        tmpFile.outputStream().use { out ->
+                            val buffer = ByteArray(64 * 1024)
+                            while (true) {
+                                val n = inp.read(buffer)
+                                if (n < 0) break
+                                out.write(buffer, 0, n)
+                            }
+                        }
+                    }
+                    parser.parse(tmpFile, filePath)
+                } finally {
+                    tmpFile.delete()
+                }
             }
         } catch (e: Throwable) {
             DebugLogger.logException(TAG, "Load book failed", e)
             null
+        }
+    }
+
+    suspend fun loadEpubImageBytes(filePath: String, href: String): ByteArray? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val file = File(filePath)
+                if (!file.exists()) return@withContext null
+                val zipFile = java.util.zip.ZipFile(file)
+                try {
+                    val name = href.removePrefix("/")
+                    var entry = zipFile.getEntry(name)
+                    if (entry == null) {
+                        val entries = zipFile.entries()
+                        while (entries.hasMoreElements()) {
+                            val e = entries.nextElement()
+                            if (e.name == name || e.name.endsWith("/$name")) {
+                                entry = e
+                                break
+                            }
+                        }
+                    }
+                    val found = entry ?: return@withContext null
+                    zipFile.getInputStream(found).use { it.readBytes() }
+                } finally {
+                    zipFile.close()
+                }
+            } catch (e: Throwable) {
+                DebugLogger.logException(TAG, "loadEpubImageBytes failed href=$href", e)
+                null
+            }
         }
     }
 

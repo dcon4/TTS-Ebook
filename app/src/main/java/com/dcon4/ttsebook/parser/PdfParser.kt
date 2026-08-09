@@ -5,13 +5,13 @@ import com.dcon4.ttsebook.data.EbookChapter
 import com.dcon4.ttsebook.data.EbookParser
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.text.PDFTextStripper
-import java.io.InputStream
+import java.io.File
 import java.security.MessageDigest
 
 class PdfParser : EbookParser {
-    override fun parse(inputStream: InputStream, filePath: String): EbookBook {
-        val doc = PDDocument.load(inputStream)
-        val title = filePath.substringAfterLast('/').removeSuffix(".pdf")
+    override fun parse(file: File, displayPath: String): EbookBook {
+        val doc = PDDocument.load(file)
+        val title = displayPath.substringAfterLast('/').removeSuffix(".pdf")
         val numPages = doc.numberOfPages
         val stripper = PDFTextStripper()
         stripper.sortByPosition = true

@@ -3,13 +3,13 @@ package com.dcon4.ttsebook.parser
 import com.dcon4.ttsebook.data.EbookBook
 import com.dcon4.ttsebook.data.EbookChapter
 import com.dcon4.ttsebook.data.EbookParser
-import java.io.InputStream
+import java.io.File
 import java.security.MessageDigest
 
 class TxtParser : EbookParser {
-    override fun parse(inputStream: InputStream, filePath: String): EbookBook {
-        val text = inputStream.bufferedReader().readText()
-        val title = filePath.substringAfterLast('/').removeSuffix(".txt")
+    override fun parse(file: File, displayPath: String): EbookBook {
+        val text = file.inputStream().bufferedReader().readText()
+        val title = displayPath.substringAfterLast('/').removeSuffix(".txt")
         val paragraphs = text.split(Regex("\\n\\s*\\n"))
             .map { it.trim() }
             .filter { it.isNotBlank() }

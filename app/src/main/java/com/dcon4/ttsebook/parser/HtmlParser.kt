@@ -5,15 +5,15 @@ import com.dcon4.ttsebook.data.EbookChapter
 import com.dcon4.ttsebook.data.EbookParser
 import org.jsoup.Jsoup
 import org.jsoup.safety.Safelist
-import java.io.InputStream
+import java.io.File
 import java.security.MessageDigest
 
 class HtmlParser : EbookParser {
-    override fun parse(inputStream: InputStream, filePath: String): EbookBook {
-        val html = inputStream.bufferedReader().readText()
+    override fun parse(file: File, displayPath: String): EbookBook {
+        val html = file.inputStream().bufferedReader().readText()
         val doc = Jsoup.parse(html)
         val title = doc.title().ifBlank {
-            filePath.substringAfterLast('/').removeSuffix(".html").removeSuffix(".htm")
+            displayPath.substringAfterLast('/').removeSuffix(".html").removeSuffix(".htm")
         }
         val headings = doc.select("h1, h2, h3")
         if (headings.isNotEmpty()) {
