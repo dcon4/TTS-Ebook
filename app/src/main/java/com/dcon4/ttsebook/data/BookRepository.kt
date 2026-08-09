@@ -48,63 +48,73 @@ class BookRepository @Inject constructor(
     fun getBookmarksFlow(bookId: String): Flow<List<BookmarkEntity>> = bookmarkDao.getBookmarks(bookId)
 
     suspend fun importBook(uri: Uri): Result<EbookBook> {
-        return try {
-            val path = uri.path ?: uri.toString()
-            var format = detectFormat(path)
-            if (!parsers.any { it.supportsFormat(format) }) {
-                format = detectFormatFromMime(context.contentResolver.getType(uri)) ?: format
-            }
-            val parser = parsers.find { it.supportsFormat(format) }
-                ?: return Result.failure(Exception("Unsupported format: $format"))
-            val booksDir = File(context.filesDir, "books")
-            booksDir.mkdirs()
-            val tmpFile = File(booksDir, "import-${System.currentTimeMillis()}.tmp")
+        return withContext(Dispatchers.IO) {
             try {
-                val input = context.contentResolver.openInputStream(uri)
-                    ?: return Result.failure(Exception("Cannot open file"))
-                input.use { inp ->
-                    tmpFile.outputStream().use { out ->
-                        val buffer = ByteArray(64 * 1024)
-                        while (true) {
-                            val n = inp.read(buffer)
-                            if (n < 0) break
-                            out.write(buffer, 0, n)
+                val path = uri.path ?: uri.toString()
+                DebugLogger.log(TAG, "Import start: $path")
+                var format = detectFormat(path)
+                if (!parsers.any { it.supportsFormat(format) }) {
+                    format = detectFormatFromMime(context.contentResolver.getType(uri)) ?: format
+                }
+                val parser = parsers.find { it.supportsFormat(format) }
+                    ?: return@withContext Result.failure(Exception("Unsupported format: $format"))
+                val booksDir = File(context.filesDir, "books")
+                booksDir.mkdirs()
+                val tmpFile = File(booksDir, "import-${System.currentTimeMillis()}.tmp")
+                try {
+                    val input = context.contentResolver.openInputStream(uri)
+                        ?: return@withContext Result.failure(Exception("Cannot open file"))
+                    val t0 = System.currentTimeMillis()
+                    var copied = 0L
+                    input.use { inp ->
+                        tmpFile.outputStream().use { out ->
+                            val buffer = ByteArray(64 * 1024)
+                            while (true) {
+                                val n = inp.read(buffer)
+                                if (n < 0) break
+                                out.write(buffer, 0, n)
+                                copied += n
+                            }
                         }
                     }
-                }
-                val ebook = parser.parse(tmpFile, path)
-                val internalFile = File(booksDir, "${ebook.id}.$format")
-                if (internalFile.exists()) {
-                    tmpFile.delete()
-                } else {
-                    if (!tmpFile.renameTo(internalFile)) {
-                        tmpFile.copyTo(internalFile, overwrite = true)
+                    DebugLogger.log(TAG, "Import streamed $copied bytes in ${System.currentTimeMillis() - t0}ms format=$format")
+                    val t1 = System.currentTimeMillis()
+                    val ebook = parser.parse(tmpFile, path)
+                    DebugLogger.log(TAG, "Import parsed in ${System.currentTimeMillis() - t1}ms chapters=${ebook.chapters.size} title=${ebook.title}")
+                    val internalFile = File(booksDir, "${ebook.id}.$format")
+                    if (internalFile.exists()) {
                         tmpFile.delete()
+                    } else {
+                        if (!tmpFile.renameTo(internalFile)) {
+                            tmpFile.copyTo(internalFile, overwrite = true)
+                            tmpFile.delete()
+                        }
                     }
-                }
-                val existing = bookDao.getBook(ebook.id)
-                if (existing == null) {
-                    bookDao.upsertBook(
-                        BookEntity(
-                            id = ebook.id,
-                            title = ebook.title,
-                            author = ebook.author,
-                            filePath = internalFile.absolutePath,
-                            contentHash = ebook.contentHash,
-                            format = format,
-                            lastOpenedAt = System.currentTimeMillis()
+                    val existing = bookDao.getBook(ebook.id)
+                    if (existing == null) {
+                        bookDao.upsertBook(
+                            BookEntity(
+                                id = ebook.id,
+                                title = ebook.title,
+                                author = ebook.author,
+                                filePath = internalFile.absolutePath,
+                                contentHash = ebook.contentHash,
+                                format = format,
+                                lastOpenedAt = System.currentTimeMillis()
+                            )
                         )
-                    )
-                } else {
-                    bookDao.upsertBook(existing.copy(lastOpenedAt = System.currentTimeMillis()))
+                    } else {
+                        bookDao.upsertBook(existing.copy(lastOpenedAt = System.currentTimeMillis()))
+                    }
+                    DebugLogger.log(TAG, "Import complete: ${internalFile.name}")
+                    Result.success(ebook)
+                } finally {
+                    if (tmpFile.exists()) tmpFile.delete()
                 }
-                Result.success(ebook)
-            } finally {
-                if (tmpFile.exists()) tmpFile.delete()
+            } catch (e: Throwable) {
+                DebugLogger.logException(TAG, "Import failed", e)
+                Result.failure(e)
             }
-        } catch (e: Exception) {
-            DebugLogger.logException(TAG, "Import failed", e)
-            Result.failure(e)
         }
     }
 

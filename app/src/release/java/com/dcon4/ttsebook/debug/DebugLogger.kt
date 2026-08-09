@@ -21,7 +21,7 @@ object DebugLogger {
         writer = FileWriter(file, true)
         writer?.write("===== Session start =====\n")
         writer?.flush()
-        verbose("DebugLogger", "Logger initialized (build ${BuildConfig.VERSION_CODE})")
+        verbose("DebugLogger", "Logger initialized (build ${BuildConfig.GIT_SHA} vc${BuildConfig.VERSION_CODE})")
     }
 
     fun log(tag: String, message: String) {

@@ -4,6 +4,7 @@ import com.dcon4.ttsebook.data.EbookBook
 import com.dcon4.ttsebook.data.EbookChapter
 import com.dcon4.ttsebook.data.EbookImage
 import com.dcon4.ttsebook.data.EbookParser
+import com.dcon4.ttsebook.debug.DebugLogger
 import nl.siegmann.epublib.domain.Book
 import nl.siegmann.epublib.domain.Resource
 import nl.siegmann.epublib.epub.EpubReader
@@ -68,7 +69,11 @@ class EpubParser : EbookParser {
         )
         return try {
             EpubReader().readEpubLazy(file.absolutePath, "UTF-8", lazyTypes)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            if (file.length() > 50L * 1024 * 1024) {
+                throw e
+            }
+            DebugLogger.logException("EpubParser", "readEpubLazy failed, falling back to eager read", e)
             FileInputStream(file).use { EpubReader().readEpub(it) }
         }
     }
