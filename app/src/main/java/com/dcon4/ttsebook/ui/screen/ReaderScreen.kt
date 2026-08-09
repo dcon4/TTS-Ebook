@@ -231,15 +231,16 @@ fun ReaderScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            if (bookFormat == "pdf" && pdfPageBitmap != null) {
+            val pageBitmap = pdfPageBitmap
+            if (bookFormat == "pdf" && pageBitmap != null) {
                 Image(
-                    bitmap = pdfPageBitmap.asImageBitmap(),
+                    bitmap = pageBitmap.asImageBitmap(),
                     contentDescription = "PDF page $pdfPageNumber",
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 320.dp)
                         .semantics { contentDescription = "PDF page $pdfPageNumber" },
-                    contentScale = ContentScale.FitWidth
+                    contentScale = ContentScale.FillWidth
                 )
             }
             if (paragraphs.isEmpty()) {
@@ -272,7 +273,7 @@ fun ReaderScreen(
                                         contentDescription =
                                             "Picture: ${item.image.label.ifBlank { "unnamed" }}"
                                     },
-                                contentScale = ContentScale.FitWidth
+                                contentScale = ContentScale.FillWidth
                             )
                             is ReaderItem.Paragraph -> Surface(
                                 color = if (item.sentenceIndex == currentParagraphIndex)

@@ -93,21 +93,21 @@ class EpubParser : EbookParser {
     }
 
     private fun findResource(book: Book, href: String): Resource? {
-        val candidates = listOf(href, href.removePrefix("/"))
+        val name = href.substringAfterLast('/')
+        val candidates = listOf(href, href.removePrefix("/"), name).distinct()
         for (candidate in candidates) {
             try {
-                val resource = book.resources.getResourceByHref(candidate)
+                val resource = book.resources.getById(candidate)
                 if (resource != null) return resource
             } catch (_: Exception) {}
         }
-        val name = href.substringAfterLast('/')
-        if (name.isNotEmpty()) {
-            try {
-                val resource = book.resources.getResourceByHref(name)
-                if (resource != null) return resource
-            } catch (_: Exception) {}
+        return try {
+            book.resources.resourceMap.values.firstOrNull {
+                it.href == href || (name.isNotEmpty() && it.href.endsWith("/$name"))
+            }
+        } catch (_: Exception) {
+            null
         }
-        return null
     }
 
     private fun resolveHref(base: String, src: String): String {
