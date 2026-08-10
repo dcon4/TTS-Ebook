@@ -449,11 +449,27 @@ class TtsPlaybackService : Service() {
                 .build()
             val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
                 .setAudioAttributes(attrs)
+                .setOnAudioFocusChangeListener(audioFocusListener)
                 .build()
             audioFocusRequest = focusRequest
             audioManager?.requestAudioFocus(focusRequest)
         } else {
-            audioManager?.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
+            audioManager?.requestAudioFocus(
+                audioFocusListener,
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN
+            )
+        }
+    }
+
+    private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { change ->
+        when (change) {
+            AudioManager.AUDIOFOCUS_LOSS,
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                DebugLogger.log(TAG, "Audio focus lost (change=$change), pausing")
+                pause()
+            }
+            else -> {}
         }
     }
 

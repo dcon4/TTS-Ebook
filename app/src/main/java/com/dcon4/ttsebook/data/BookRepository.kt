@@ -87,15 +87,13 @@ class BookRepository @Inject constructor(
                     val ebook = parser.parse(tmpFile, path)
                     DebugLogger.log(TAG, "Import parsed in ${System.currentTimeMillis() - t1}ms chapters=${ebook.chapters.size} title=${ebook.title}")
                     val internalFile = File(booksDir, "${ebook.id}.$format")
-                    if (internalFile.exists()) {
+                    if (internalFile.exists() && isValidArchive(internalFile)) {
                         tmpFile.delete()
                     } else {
-                        if (!tmpFile.renameTo(internalFile)) {
-                            tmpFile.copyTo(internalFile, overwrite = true)
-                            tmpFile.delete()
-                        }
+                        tmpFile.copyTo(internalFile, overwrite = true)
+                        tmpFile.delete()
                     }
-                    writeCache(internalFile, ebook)
+                    writeCache(cacheFileFor(internalFile), ebook)
                     memoryCache = internalFile.absolutePath to ebook
                     val existing = bookDao.getBook(ebook.id)
                     if (existing == null) {
@@ -140,6 +138,16 @@ class BookRepository @Inject constructor(
 
     private fun cacheFileFor(file: File): File =
         File(file.absolutePath.substringBeforeLast('.') + ".cache")
+
+    private fun isValidArchive(file: File): Boolean {
+        return try {
+            java.util.zip.ZipFile(file).use { }
+            true
+        } catch (e: Throwable) {
+            DebugLogger.log(TAG, "Existing archive invalid, will replace: ${file.name} (${e.message})")
+            false
+        }
+    }
 
     private fun writeCache(cacheFile: File, book: EbookBook) {
         try {
@@ -283,7 +291,18 @@ class BookRepository @Inject constructor(
             if (file.exists()) {
                 val cacheFile = cacheFileFor(file)
                 readCache(cacheFile)?.let { return it }
-                val book = parser.parse(file, filePath)
+                val book = try {
+                    parser.parse(file, filePath)
+                } catch (e: Throwable) {
+                    val recovered = readCache(file)
+                    if (recovered != null) {
+                        DebugLogger.log(TAG, "Recovered book from damaged file: ${file.name}")
+                        writeCache(cacheFile, recovered)
+                        recovered
+                    } else {
+                        throw e
+                    }
+                }
                 memoryCache = filePath to book
                 writeCache(cacheFile, book)
                 book

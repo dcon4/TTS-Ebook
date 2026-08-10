@@ -107,12 +107,14 @@ class TtsManager @Inject constructor(
 
     fun speak(text: String, utteranceId: String): Int {
         if (!ttsReady) return TextToSpeech.ERROR
+        if (text.isBlank()) return TextToSpeech.SUCCESS
         return tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId) ?: TextToSpeech.ERROR
     }
 
     fun speakChunked(text: String, baseId: String, onChunkDone: ((String) -> Unit)? = null): Int {
         if (!ttsReady) return TextToSpeech.ERROR
-        val chunks = chunkText(text)
+        val chunks = chunkText(text).filter { it.isNotBlank() }
+        if (chunks.isEmpty()) return TextToSpeech.SUCCESS
         var result = TextToSpeech.SUCCESS
         chunks.forEachIndexed { index, chunk ->
             val utteranceId = "${baseId}_chunk_$index"
