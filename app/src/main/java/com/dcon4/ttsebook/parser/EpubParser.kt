@@ -16,7 +16,7 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 class EpubParser : EbookParser {
 
-    private data class ManifestItem(val id: String, val href: String, val mediaType: String)
+    private data class ManifestItem(val id: String, val href: String, val mediaType: String, val nav: Boolean)
 
     override fun parse(file: File, displayPath: String): EbookBook {
         val t0 = System.currentTimeMillis()
@@ -43,7 +43,10 @@ class EpubParser : EbookParser {
         val hrefToType = manifest.values.associate { resolveEntry(opfDir, it.href) to it.mediaType }
 
         val spineItems = spineIds.mapNotNull { manifest[it] }
-        val htmlItems = (if (spineItems.isNotEmpty()) spineItems else manifest.values).filter { isHtmlType(it) }
+        val ncxItem = findNcxItem(manifest)
+        val htmlItems = (if (spineItems.isNotEmpty()) spineItems else manifest.values)
+            .filter { isHtmlType(it) }
+            .filter { !it.nav || ncxItem == null }
         val chapterHrefs = htmlItems.map { resolveEntry(opfDir, it.href) }
 
         val chapters = mutableListOf<EbookChapter>()
@@ -114,7 +117,8 @@ class EpubParser : EbookParser {
             val id = el.getAttribute("id")
             val href = el.getAttribute("href")
             if (id.isBlank() || href.isBlank()) continue
-            result[id] = ManifestItem(id, href, el.getAttribute("media-type"))
+            val nav = el.getAttribute("properties").split(' ').any { it.equals("nav", ignoreCase = true) }
+            result[id] = ManifestItem(id, href, el.getAttribute("media-type"), nav)
         }
         return result
     }
@@ -131,6 +135,13 @@ class EpubParser : EbookParser {
         return result
     }
 
+    private fun findNcxItem(manifest: Map<String, ManifestItem>): ManifestItem? {
+        return manifest.values.firstOrNull {
+            it.mediaType.equals("application/x-dtbncx+xml", ignoreCase = true) ||
+                it.href.endsWith(".ncx", ignoreCase = true)
+        }
+    }
+
     private fun applyNcxTitles(
         zip: ZipFile,
         manifest: Map<String, ManifestItem>,
@@ -138,10 +149,7 @@ class EpubParser : EbookParser {
         chapterHrefs: List<String>,
         chapters: MutableList<EbookChapter>
     ) {
-        val ncxItem = manifest.values.firstOrNull {
-            it.mediaType.equals("application/x-dtbncx+xml", ignoreCase = true) ||
-                it.href.endsWith(".ncx", ignoreCase = true)
-        } ?: return
+        val ncxItem = findNcxItem(manifest) ?: return
         val ncxHref = resolveEntry(opfDir, ncxItem.href)
         val ncxDir = ncxHref.substringBeforeLast('/', "")
         val ncx = readXml(zip, ncxHref) ?: return
@@ -170,10 +178,11 @@ class EpubParser : EbookParser {
             val n = nodes.item(i)
             if (n.nodeType != Node.ELEMENT_NODE) continue
             val child = n as Element
-            if (localNameOf(child.tagName) != "navPoint") continue
-            val label = directChild(child, "navLabel")?.let { directChild(it, "text") }?.textContent?.trim().orEmpty()
-            val src = directChild(child, "content")?.getAttribute("src").orEmpty()
-            out.add(label to src)
+            if (localNameOf(child.tagName) == "navPoint") {
+                val label = directChild(child, "navLabel")?.let { directChild(it, "text") }?.textContent?.trim().orEmpty()
+                val src = directChild(child, "content")?.getAttribute("src").orEmpty()
+                out.add(label to src)
+            }
             collectNavPoints(child, out)
         }
     }
@@ -233,8 +242,12 @@ class EpubParser : EbookParser {
             val factory = DocumentBuilderFactory.newInstance()
             factory.isNamespaceAware = false
             factory.isExpandEntityReferences = false
-            factory.setFeature("http://xml.org/sax/features/external-general-entities", false)
-            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+            try {
+                factory.setFeature("http://xml.org/sax/features/external-general-entities", false)
+                factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+            } catch (_: Exception) {
+                // features not supported by this parser — safe to continue
+            }
             val builder = factory.newDocumentBuilder()
             zip.getInputStream(entry).use { builder.parse(it) }
         } catch (e: Exception) {
