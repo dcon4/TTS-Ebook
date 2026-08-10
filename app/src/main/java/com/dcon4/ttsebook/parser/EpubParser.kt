@@ -209,8 +209,9 @@ class EpubParser : EbookParser {
         for (match in imgRegex.findAll(html)) {
             var blockCount = 0
             var cursor = scanFrom
-            while (cursor < match.range.first) {
-                val b = blockRegex.find(html, cursor, match.range.first) ?: break
+            while (true) {
+                val b = blockRegex.find(html, cursor) ?: break
+                if (b.range.first >= match.range.first) break
                 blockCount++
                 cursor = b.range.last + 1
             }
