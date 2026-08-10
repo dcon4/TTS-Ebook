@@ -207,7 +207,14 @@ class EpubParser : EbookParser {
         var anchor = 0
         var scanFrom = 0
         for (match in imgRegex.findAll(html)) {
-            anchor += blockRegex.findAll(html, scanFrom, match.range.first).count()
+            var blockCount = 0
+            var cursor = scanFrom
+            while (cursor < match.range.first) {
+                val b = blockRegex.find(html, cursor, match.range.first) ?: break
+                blockCount++
+                cursor = b.range.last + 1
+            }
+            anchor += blockCount
             scanFrom = match.range.first
             val src = srcRegex.find(match.value)?.groupValues?.get(1) ?: continue
             val resolved = resolveEntry(baseDir, src)
