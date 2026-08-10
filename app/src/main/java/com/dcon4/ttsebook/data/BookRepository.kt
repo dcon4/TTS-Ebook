@@ -14,6 +14,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -28,6 +30,9 @@ class BookRepository @Inject constructor(
     private val parsers = listOf(
         EpubParser(), PdfParser(), TxtParser(), HtmlParser()
     )
+
+    @Volatile
+    private var memoryCache: Pair<String, EbookBook>? = null
 
     companion object {
         private const val TAG = "BookRepository"
@@ -90,6 +95,8 @@ class BookRepository @Inject constructor(
                             tmpFile.delete()
                         }
                     }
+                    writeCache(internalFile, ebook)
+                    memoryCache = internalFile.absolutePath to ebook
                     val existing = bookDao.getBook(ebook.id)
                     if (existing == null) {
                         bookDao.upsertBook(
@@ -119,8 +126,98 @@ class BookRepository @Inject constructor(
     }
 
     suspend fun removeBook(bookId: String) {
+        val book = bookDao.getBook(bookId)
+        book?.let { entity ->
+            val file = File(entity.filePath)
+            if (file.exists()) file.delete()
+            val cacheFile = File(entity.filePath.substringBeforeLast('.') + ".cache")
+            if (cacheFile.exists()) cacheFile.delete()
+        }
+        memoryCache = null
         bookDao.deleteBook(bookId)
         positionDao.deletePosition(bookId)
+    }
+
+    private fun cacheFileFor(file: File): File =
+        File(file.absolutePath.substringBeforeLast('.') + ".cache")
+
+    private fun writeCache(cacheFile: File, book: EbookBook) {
+        try {
+            val chaptersJson = JSONArray()
+            for (ch in book.chapters) {
+                val imagesJson = JSONArray()
+                for (img in ch.images) {
+                    imagesJson.put(
+                        JSONObject()
+                            .put("anchor", img.anchorParagraphIndex)
+                            .put("label", img.label)
+                            .put("mime", img.mimeType ?: JSONObject.NULL)
+                            .put("href", img.href)
+                    )
+                }
+                chaptersJson.put(
+                    JSONObject()
+                        .put("index", ch.index)
+                        .put("title", ch.title)
+                        .put("content", ch.content)
+                        .put("images", imagesJson)
+                        .put("page", ch.pageNumber ?: JSONObject.NULL)
+                )
+            }
+            val json = JSONObject()
+                .put("id", book.id)
+                .put("title", book.title)
+                .put("author", book.author)
+                .put("contentHash", book.contentHash)
+                .put("chapters", chaptersJson)
+            cacheFile.writeText(json.toString())
+        } catch (e: Throwable) {
+            DebugLogger.logException(TAG, "Cache write failed", e)
+        }
+    }
+
+    private fun readCache(cacheFile: File): EbookBook? {
+        return try {
+            if (!cacheFile.exists()) return null
+            val json = JSONObject(cacheFile.readText())
+            val chaptersJson = json.getJSONArray("chapters")
+            val chapters = ArrayList<EbookChapter>(chaptersJson.length())
+            for (i in 0 until chaptersJson.length()) {
+                val ch = chaptersJson.getJSONObject(i)
+                val imagesJson = ch.getJSONArray("images")
+                val images = ArrayList<EbookImage>(imagesJson.length())
+                for (j in 0 until imagesJson.length()) {
+                    val img = imagesJson.getJSONObject(j)
+                    images.add(
+                        EbookImage(
+                            anchorParagraphIndex = img.getInt("anchor"),
+                            label = img.getString("label"),
+                            mimeType = if (img.isNull("mime")) null else img.getString("mime"),
+                            href = img.getString("href")
+                        )
+                    )
+                }
+                chapters.add(
+                    EbookChapter(
+                        index = ch.getInt("index"),
+                        title = ch.getString("title"),
+                        content = ch.getString("content"),
+                        images = images,
+                        pageNumber = if (ch.isNull("page")) null else ch.getInt("page")
+                    )
+                )
+            }
+            EbookBook(
+                id = json.getString("id"),
+                title = json.getString("title"),
+                author = json.getString("author"),
+                chapters = chapters,
+                contentHash = json.getString("contentHash")
+            )
+        } catch (e: Throwable) {
+            DebugLogger.logException(TAG, "Cache read failed", e)
+            null
+        }
     }
 
     suspend fun renderPdfPage(filePath: String, pageNumber: Int, scale: Float): Bitmap? {
@@ -179,11 +276,17 @@ class BookRepository @Inject constructor(
 
     fun loadBook(filePath: String): EbookBook? {
         return try {
+            memoryCache?.let { if (it.first == filePath) return it.second }
             val format = detectFormat(filePath)
             val parser = parsers.find { it.supportsFormat(format) } ?: return null
             val file = File(filePath)
             if (file.exists()) {
-                parser.parse(file, filePath)
+                val cacheFile = cacheFileFor(file)
+                readCache(cacheFile)?.let { return it }
+                val book = parser.parse(file, filePath)
+                memoryCache = filePath to book
+                writeCache(cacheFile, book)
+                book
             } else {
                 val uri = Uri.parse(filePath)
                 val input = context.contentResolver.openInputStream(uri) ?: return null
@@ -199,7 +302,9 @@ class BookRepository @Inject constructor(
                             }
                         }
                     }
-                    parser.parse(tmpFile, filePath)
+                    parser.parse(tmpFile, filePath).also {
+                        memoryCache = filePath to it
+                    }
                 } finally {
                     tmpFile.delete()
                 }

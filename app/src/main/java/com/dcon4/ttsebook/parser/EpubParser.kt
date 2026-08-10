@@ -204,11 +204,14 @@ class EpubParser : EbookParser {
         val srcRegex = Regex("""src\s*=\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
         val altRegex = Regex("""alt\s*=\s*["']([^"']*)["']""", RegexOption.IGNORE_CASE)
         val blockRegex = Regex("(?i)<(p|div|li|h[1-6]|section|article)[\\s>]")
+        var anchor = 0
+        var scanFrom = 0
         for (match in imgRegex.findAll(html)) {
+            anchor += blockRegex.findAll(html, scanFrom, match.range.first).count()
+            scanFrom = match.range.first
             val src = srcRegex.find(match.value)?.groupValues?.get(1) ?: continue
             val resolved = resolveEntry(baseDir, src)
             if (resolved.contains("://")) continue
-            val anchor = blockRegex.findAll(html.substring(0, match.range.first)).count()
             val alt = altRegex.find(match.value)?.groupValues?.get(1)?.trim().orEmpty()
             val label = alt.ifEmpty { src.substringAfterLast('/') }
             images.add(EbookImage(anchor, label, hrefToType[resolved], resolved))

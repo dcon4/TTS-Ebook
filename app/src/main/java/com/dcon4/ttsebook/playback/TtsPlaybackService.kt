@@ -96,6 +96,7 @@ class TtsPlaybackService : Service() {
 
     private var hasPendingChunks = false
     private var ttsInitPending = false
+    private var pendingJump: Pair<Int, Int>? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -149,11 +150,15 @@ class TtsPlaybackService : Service() {
                             chapters = bookEbook.chapters
                             this@TtsPlaybackService.bookId = bookEbook.id
                             this@TtsPlaybackService.bookTitle = bookEbook.title
-                            this@TtsPlaybackService.currentChapterIndex = intent.getIntExtra("startChapter", 0)
-                                .coerceIn(0, chapters.lastIndex.coerceAtLeast(0))
+                            val pending = pendingJump
+                            pendingJump = null
+                            this@TtsPlaybackService.currentChapterIndex =
+                                (pending?.first ?: intent.getIntExtra("startChapter", 0))
+                                    .coerceIn(0, chapters.lastIndex.coerceAtLeast(0))
                             loadChapterParagraphs()
-                            this@TtsPlaybackService.currentParagraphIndex = intent.getIntExtra("startParagraph", 0)
-                                .coerceIn(0, paragraphs.lastIndex.coerceAtLeast(0))
+                            this@TtsPlaybackService.currentParagraphIndex =
+                                (pending?.second ?: intent.getIntExtra("startParagraph", 0))
+                                    .coerceIn(0, paragraphs.lastIndex.coerceAtLeast(0))
                             resume()
                         } catch (e: Throwable) {
                             DebugLogger.logException(TAG, "Play action failed", e)
@@ -202,9 +207,9 @@ class TtsPlaybackService : Service() {
         this.bookId = bookId
         this.bookTitle = title
         this.chapters = chapters
-        this.currentChapterIndex = startChapter.coerceIn(0, chapters.lastIndex)
+        this.currentChapterIndex = startChapter.coerceIn(0, chapters.lastIndex.coerceAtLeast(0))
         loadChapterParagraphs()
-        currentParagraphIndex = startParagraph.coerceIn(0, paragraphs.lastIndex)
+        currentParagraphIndex = startParagraph.coerceIn(0, paragraphs.lastIndex.coerceAtLeast(0))
         broadcastPosition()
         DebugLogger.log(TAG, "Set book: $title chapter=$currentChapterIndex para=$currentParagraphIndex")
     }
@@ -318,9 +323,14 @@ class TtsPlaybackService : Service() {
     }
 
     fun jumpTo(chapterIndex: Int, paragraphIndex: Int) {
-        currentChapterIndex = chapterIndex.coerceIn(0, chapters.lastIndex)
+        if (chapters.isEmpty()) {
+            DebugLogger.log(TAG, "Jump queued while loading: ch=$chapterIndex p=$paragraphIndex")
+            pendingJump = chapterIndex to paragraphIndex
+            return
+        }
+        currentChapterIndex = chapterIndex.coerceIn(0, chapters.lastIndex.coerceAtLeast(0))
         loadChapterParagraphs()
-        currentParagraphIndex = paragraphIndex.coerceIn(0, paragraphs.lastIndex)
+        currentParagraphIndex = paragraphIndex.coerceIn(0, paragraphs.lastIndex.coerceAtLeast(0))
         if (isPlaying) speakCurrent()
         broadcastPosition()
         updateNotification()
