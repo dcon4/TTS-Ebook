@@ -150,6 +150,28 @@ fun PronunciationScreen(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .semantics { contentDescription = "Match case for ${entry.word}" },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Switch(
+                                checked = entry.matchCase,
+                                onCheckedChange = { viewModel.setMatchCase(entry.id, it) }
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Match case",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                "(replace only when letter case matches exactly)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         Spacer(Modifier.height(8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),

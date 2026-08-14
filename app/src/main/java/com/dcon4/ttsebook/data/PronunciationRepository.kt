@@ -36,6 +36,12 @@ class PronunciationRepository @Inject constructor(
         DebugLogger.log("PronunciationRepository", "Removed entry id=$id")
     }
 
+    suspend fun setMatchCase(id: Long, matchCase: Boolean) {
+        dao.setMatchCase(id, matchCase)
+        reload()
+        DebugLogger.log("PronunciationRepository", "Set matchCase=$matchCase for entry id=$id")
+    }
+
     suspend fun reload() {
         entries = dao.getAll().let { flow ->
             var list = emptyList<PronunciationEntity>()
@@ -44,10 +50,11 @@ class PronunciationRepository @Inject constructor(
         }
         patterns = entries.map { entry ->
             val quoted = Pattern.quote(entry.word)
+            val flag = if (entry.matchCase) "" else "(?i)"
             val pattern = if (isSingleWord(entry.word)) {
-                Pattern.compile("(?i)\\b$quoted\\b")
+                Pattern.compile("$flag\\b$quoted\\b")
             } else {
-                Pattern.compile("(?i)$quoted")
+                Pattern.compile("$flag$quoted")
             }
             pattern to entry.replacement
         }

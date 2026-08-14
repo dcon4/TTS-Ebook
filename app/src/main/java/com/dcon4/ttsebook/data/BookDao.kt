@@ -68,4 +68,7 @@ interface PronunciationDao {
 
     @Query("DELETE FROM pronunciations WHERE id = :id")
     suspend fun delete(id: Long)
+
+    @Query("UPDATE pronunciations SET matchCase = :matchCase WHERE id = :id")
+    suspend fun setMatchCase(id: Long, matchCase: Boolean)
 }

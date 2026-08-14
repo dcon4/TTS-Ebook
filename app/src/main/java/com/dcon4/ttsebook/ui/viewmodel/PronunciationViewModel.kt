@@ -57,6 +57,12 @@ class PronunciationViewModel @Inject constructor(
         }
     }
 
+    fun setMatchCase(id: Long, matchCase: Boolean) {
+        viewModelScope.launch {
+            repository.setMatchCase(id, matchCase)
+        }
+    }
+
     fun testPronunciation(text: String) {
         val t = text.trim()
         if (t.isEmpty()) return
