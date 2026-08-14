@@ -6,6 +6,7 @@ import com.dcon4.ttsebook.data.BookDao
 import com.dcon4.ttsebook.data.BookmarkDao
 import com.dcon4.ttsebook.data.BookRepository
 import com.dcon4.ttsebook.data.PositionDao
+import com.dcon4.ttsebook.data.PronunciationDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -31,4 +32,7 @@ object AppModule {
 
     @Provides
     fun provideBookmarkDao(db: AppDatabase): BookmarkDao = db.bookmarkDao()
+
+    @Provides
+    fun providePronunciationDao(db: AppDatabase): PronunciationDao = db.pronunciationDao()
 }

@@ -71,6 +71,7 @@ class TtsPlaybackService : Service() {
 
     @Inject lateinit var ttsManager: TtsManager
     @Inject lateinit var bookRepository: com.dcon4.ttsebook.data.BookRepository
+    @Inject lateinit var pronunciationRepository: com.dcon4.ttsebook.data.PronunciationRepository
     @Inject lateinit var positionDao: PositionDao
     @Inject lateinit var bookmarkDao: BookmarkDao
 
@@ -356,7 +357,7 @@ class TtsPlaybackService : Service() {
     private fun loadChapterParagraphs() {
         paragraphs = if (chapters.isNotEmpty() && currentChapterIndex in chapters.indices) {
             val chapter = chapters[currentChapterIndex]
-            ttsManager.splitSentences(chapter.content)
+            ttsManager.splitSentences(pronunciationRepository.applyTo(chapter.content))
         } else {
             emptyList()
         }

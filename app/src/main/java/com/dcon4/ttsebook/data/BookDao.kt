@@ -57,3 +57,15 @@ interface BookmarkDao {
     @Query("DELETE FROM bookmarks WHERE id = :bookmarkId")
     suspend fun removeBookmark(bookmarkId: Long)
 }
+
+@Dao
+interface PronunciationDao {
+    @Query("SELECT * FROM pronunciations ORDER BY id")
+    fun getAll(): Flow<List<PronunciationEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(entry: PronunciationEntity)
+
+    @Query("DELETE FROM pronunciations WHERE id = :id")
+    suspend fun delete(id: Long)
+}

@@ -5,14 +5,26 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
+import com.dcon4.ttsebook.data.PronunciationRepository
 import com.dcon4.ttsebook.debug.DebugLogger
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import dagger.hilt.android.HiltAndroidApp
+import javax.inject.Inject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 private val Application.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
 @HiltAndroidApp
 class TtsEbookApp : Application() {
+
+    @Inject
+    lateinit var pronunciationRepository: PronunciationRepository
+
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     override fun onCreate() {
         super.onCreate()
         DebugLogger.init(this)
@@ -30,6 +42,7 @@ class TtsEbookApp : Application() {
             defaultHandler?.uncaughtException(thread, throwable)
         }
         PDFBoxResourceLoader.init(this)
+        appScope.launch { pronunciationRepository.reload() }
         DebugLogger.verbose("TtsEbookApp", "Application onCreate")
     }
 }

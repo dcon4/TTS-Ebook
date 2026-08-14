@@ -35,3 +35,10 @@ data class BookmarkEntity(
     val label: String,
     val createdAt: Long = System.currentTimeMillis()
 )
+
+@Entity(tableName = "pronunciations")
+data class PronunciationEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val word: String,
+    val replacement: String
+)

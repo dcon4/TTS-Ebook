@@ -38,7 +38,8 @@ data class ChapterImageUi(
 @HiltViewModel
 class ReaderViewModel @Inject constructor(
     application: Application,
-    private val bookRepository: BookRepository
+    private val bookRepository: BookRepository,
+    private val pronunciationRepository: com.dcon4.ttsebook.data.PronunciationRepository
 ) : AndroidViewModel(application) {
 
     companion object {
@@ -96,7 +97,8 @@ class ReaderViewModel @Inject constructor(
 
     private fun computeParagraphs(book: EbookBook?, chapterIndex: Int): List<String> {
         val chapter = book?.chapters?.getOrNull(chapterIndex) ?: return emptyList()
-        return chapter.content.split(Regex("(?<=[.!?])\\s+"))
+        return pronunciationRepository.applyTo(chapter.content)
+            .split(Regex("(?<=[.!?])\\s+"))
             .map { it.trim() }
             .filter { it.isNotBlank() }
     }

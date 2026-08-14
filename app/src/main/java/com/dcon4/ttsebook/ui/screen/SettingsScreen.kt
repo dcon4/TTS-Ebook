@@ -21,6 +21,7 @@ import com.dcon4.ttsebook.ui.viewmodel.SettingsViewModel
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onNavigateToPronunciations: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -115,6 +116,23 @@ fun SettingsScreen(
                             text = "${String.format("%.2f", speechRate)}x",
                             style = MaterialTheme.typography.bodySmall
                         )
+                    }
+                }
+            }
+
+            item {
+                OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Custom Pronunciations", style = MaterialTheme.typography.labelLarge)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "Replace words with custom text when reading aloud",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        TextButton(onClick = onNavigateToPronunciations) {
+                            Text("Manage pronunciations")
+                        }
                     }
                 }
             }

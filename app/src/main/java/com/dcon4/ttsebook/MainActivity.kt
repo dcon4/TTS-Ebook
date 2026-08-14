@@ -26,6 +26,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.dcon4.ttsebook.debug.DebugLogger
 import com.dcon4.ttsebook.ui.screen.LibraryScreen
+import com.dcon4.ttsebook.ui.screen.PronunciationScreen
 import com.dcon4.ttsebook.ui.screen.ReaderScreen
 import com.dcon4.ttsebook.ui.screen.SearchScreen
 import com.dcon4.ttsebook.ui.screen.SettingsScreen
@@ -190,7 +191,16 @@ fun TtsEbookNavHost(
         }
 
         composable("settings") {
-            SettingsScreen(onBack = { navController.popBackStack() })
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToPronunciations = {
+                    navController.navigate("pronunciations")
+                }
+            )
+        }
+
+        composable("pronunciations") {
+            PronunciationScreen(onBack = { navController.popBackStack() })
         }
     }
 }
