@@ -41,6 +41,26 @@ jobs:
       - name: List APK outputs
         run: find app/build/outputs -name "*.apk" -type f
 
+      - name: Verify APK matches pinned debug keystore
+        shell: bash
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          apk_cert=$(keytool -printcert -jarfile "$APK" 2>/dev/null | grep -i '^SHA256:' | head -1 | sed 's/.*: *//' | tr -d ':' | tr '[:upper:]' '[:lower:]')
+          echo "APK signing cert: $apk_cert"
+          if [ -z "$apk_cert" ]; then echo "NO APK SIGNING CERTIFICATE FOUND"; exit 1; fi
+          if [ -n "$DEBUG_KEYSTORE" ]; then
+            ks_cert=$(keytool -printcert -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey 2>/dev/null | grep -i '^SHA256:' | head -1 | sed 's/.*: *//' | tr -d ':' | tr '[:upper:]' '[:lower:]')
+            echo "Pinned keystore cert: $ks_cert"
+            if [ -z "$ks_cert" ]; then echo "COULD NOT READ PINNED KEYSTORE"; exit 1; fi
+            if [ "$apk_cert" != "$ks_cert" ]; then
+              echo "APK signature does not match pinned keystore"
+              exit 1
+            fi
+            echo "APK signature matches pinned keystore"
+          fi
+        env:
+          DEBUG_KEYSTORE: ${{ secrets.DEBUG_KEYSTORE }}
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
