@@ -38,6 +38,18 @@ android {
         }
     }
 
+    signingConfigs {
+        val keystore = java.io.File(System.getProperty("user.home"), ".android/debug.keystore")
+        if (keystore.exists()) {
+            create("debug") {
+                storeFile = keystore
+                storePassword = System.getenv("DEBUG_KEYSTORE_PASS") ?: "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = System.getenv("DEBUG_KEYSTORE_KEY_PASS") ?: "android"
+            }
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
