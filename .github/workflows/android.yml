@@ -25,6 +25,16 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
+      - name: Use stable debug keystore
+        shell: bash
+        run: |
+          if [ -n "$DEBUG_KEYSTORE" ]; then
+            mkdir -p "$HOME/.android"
+            echo "$DEBUG_KEYSTORE" | base64 -d > "$HOME/.android/debug.keystore"
+          fi
+        env:
+          DEBUG_KEYSTORE: ${{ secrets.DEBUG_KEYSTORE }}
+
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
 
