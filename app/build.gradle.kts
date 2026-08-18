@@ -41,7 +41,7 @@ android {
     }
 
     signingConfigs {
-        val keystore = java.io.File(System.getProperty("user.home"), ".android/debug.keystore")
+        val keystore = File(System.getProperty("user.home"), ".android/debug.keystore")
         if (keystore.exists()) {
             create("debug") {
                 storeFile = keystore
