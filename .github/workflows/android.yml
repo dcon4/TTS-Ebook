@@ -31,9 +31,18 @@ jobs:
           if [ -n "$DEBUG_KEYSTORE" ]; then
             mkdir -p "$HOME/.android"
             echo "$DEBUG_KEYSTORE" | base64 -d > "$HOME/.android/debug.keystore"
+            ls -l "$HOME/.android/debug.keystore"
+            openssl pkcs12 -in "$HOME/.android/debug.keystore" -passin pass:android -nokeys 2>/dev/null \
+              | openssl x509 -outform DER 2>/dev/null | sha256sum
+            echo "Pinned keystore decoded OK"
+          else
+            echo "DEBUG_KEYSTORE secret not set - falling back to generated keystore"
           fi
         env:
           DEBUG_KEYSTORE: ${{ secrets.DEBUG_KEYSTORE }}
+
+      - name: Print signing config
+        run: ./gradlew :app:signingReport
 
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
@@ -53,7 +62,9 @@ jobs:
           echo "APK signing cert SHA-256: $apk_digest"
           if [ -z "$apk_digest" ]; then echo "NO APK SIGNING CERTIFICATE FOUND"; exit 1; fi
           if [ -n "$DEBUG_KEYSTORE" ]; then
-            ks_digest=$(keytool -printcert -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey 2>/dev/null | grep -i '^SHA256:' | head -1 | sed 's/.*: *//' | tr -d ':' | tr '[:upper:]' '[:lower:]')
+            openssl pkcs12 -in "$HOME/.android/debug.keystore" -passin pass:android -nokeys 2>/dev/null \
+              | openssl x509 -outform DER 2>/dev/null > /tmp/ks.der
+            ks_digest=$(sha256sum /tmp/ks.der | cut -d' ' -f1)
             echo "Pinned keystore cert SHA-256: $ks_digest"
             if [ -z "$ks_digest" ]; then echo "COULD NOT READ PINNED KEYSTORE"; exit 1; fi
             if [ "$apk_digest" != "$ks_digest" ]; then
