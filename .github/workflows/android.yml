@@ -44,15 +44,19 @@ jobs:
       - name: Verify APK matches pinned debug keystore
         shell: bash
         run: |
+          set -e
           APK=app/build/outputs/apk/debug/app-debug.apk
-          apk_cert=$(keytool -printcert -jarfile "$APK" 2>/dev/null | grep -i '^SHA256:' | head -1 | sed 's/.*: *//' | tr -d ':' | tr '[:upper:]' '[:lower:]')
-          echo "APK signing cert: $apk_cert"
-          if [ -z "$apk_cert" ]; then echo "NO APK SIGNING CERTIFICATE FOUND"; exit 1; fi
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f 2>/dev/null | sort -V | tail -1)
+          echo "Using: $APKSIGNER"
+          "$APKSIGNER" verify --print-certs "$APK" | tee /tmp/apk_certs.txt
+          apk_digest=$(grep -i 'SHA-256 digest' /tmp/apk_certs.txt | head -1 | sed 's/.*: *//' | tr -d ':' | tr '[:upper:]' '[:lower:]')
+          echo "APK signing cert SHA-256: $apk_digest"
+          if [ -z "$apk_digest" ]; then echo "NO APK SIGNING CERTIFICATE FOUND"; exit 1; fi
           if [ -n "$DEBUG_KEYSTORE" ]; then
-            ks_cert=$(keytool -printcert -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey 2>/dev/null | grep -i '^SHA256:' | head -1 | sed 's/.*: *//' | tr -d ':' | tr '[:upper:]' '[:lower:]')
-            echo "Pinned keystore cert: $ks_cert"
-            if [ -z "$ks_cert" ]; then echo "COULD NOT READ PINNED KEYSTORE"; exit 1; fi
-            if [ "$apk_cert" != "$ks_cert" ]; then
+            ks_digest=$(keytool -printcert -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey 2>/dev/null | grep -i '^SHA256:' | head -1 | sed 's/.*: *//' | tr -d ':' | tr '[:upper:]' '[:lower:]')
+            echo "Pinned keystore cert SHA-256: $ks_digest"
+            if [ -z "$ks_digest" ]; then echo "COULD NOT READ PINNED KEYSTORE"; exit 1; fi
+            if [ "$apk_digest" != "$ks_digest" ]; then
               echo "APK signature does not match pinned keystore"
               exit 1
             fi
