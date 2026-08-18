@@ -2,6 +2,7 @@ package com.dcon4.ttsebook.data
 
 import com.dcon4.ttsebook.debug.DebugLogger
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import java.util.regex.Matcher
 import java.util.regex.Pattern
 import javax.inject.Inject
@@ -43,11 +44,7 @@ class PronunciationRepository @Inject constructor(
     }
 
     suspend fun reload() {
-        entries = dao.getAll().let { flow ->
-            var list = emptyList<PronunciationEntity>()
-            flow.collect { list = it }
-            list
-        }
+        entries = dao.getAll().first()
         patterns = entries.map { entry ->
             val quoted = Pattern.quote(entry.word)
             val flag = if (entry.matchCase) "" else "(?i)"
