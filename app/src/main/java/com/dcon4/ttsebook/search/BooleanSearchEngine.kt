@@ -17,18 +17,26 @@ class BooleanSearchEngine {
         val tokens = tokenize(query)
         val results = mutableListOf<SearchResult>()
         for ((ci, chapter) in chapters.withIndex()) {
-            val paragraphs = chapter.content.split(Regex("\\n\\s*\\n"))
+            val content = chapter.content
+            val paragraphs = content.split(Regex("\\n\\s*\\n"))
                 .map { it.trim() }
                 .filter { it.isNotBlank() }
+            val sentenceBounds = sentenceBounds(content)
             for ((pi, paragraph) in paragraphs.withIndex()) {
                 if (evaluate(tokens, paragraph.lowercase())) {
                     val snippet = buildSnippet(paragraph, 120)
                     val relevance = computeRelevance(query, paragraph)
+                    val pStart = content.indexOf(paragraph)
+                    val sentenceIndex = if (pStart >= 0) {
+                        sentenceBounds.indexOfFirst { pStart < it.second }.coerceAtLeast(0)
+                    } else {
+                        0
+                    }
                     results.add(
                         SearchResult(
                             chapterIndex = ci,
                             chapterTitle = chapter.title,
-                            paragraphIndex = pi,
+                            paragraphIndex = sentenceIndex,
                             snippet = snippet,
                             relevance = relevance
                         )
@@ -37,6 +45,18 @@ class BooleanSearchEngine {
             }
         }
         return results.sortedByDescending { it.relevance }
+    }
+
+    private fun sentenceBounds(content: String): List<Pair<Int, Int>> {
+        val regex = Regex("(?<=[.!?])\\s+")
+        val bounds = mutableListOf<Pair<Int, Int>>()
+        var start = 0
+        for (m in regex.findAll(content)) {
+            bounds.add(start to m.range.first + 1)
+            start = m.range.last + 1
+        }
+        if (start < content.length) bounds.add(start to content.length)
+        return bounds
     }
 
     private data class Token(

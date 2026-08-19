@@ -157,6 +157,7 @@ fun TtsEbookNavHost(
                 bookId = bookId,
                 onBack = { navController.popBackStack() },
                 onResultSelected = { chapterIndex, paragraphIndex ->
+                    DebugLogger.log("MainActivity", "Search result selected: ch$chapterIndex p$paragraphIndex")
                     navController.navigate("reader/$bookId/$chapterIndex/$paragraphIndex") {
                         popUpTo("reader/$bookId") { inclusive = true }
                     }

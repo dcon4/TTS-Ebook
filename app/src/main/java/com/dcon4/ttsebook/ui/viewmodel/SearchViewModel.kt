@@ -6,6 +6,7 @@ import com.dcon4.ttsebook.data.BookRepository
 import com.dcon4.ttsebook.data.EbookChapter
 import com.dcon4.ttsebook.search.BooleanSearchEngine
 import com.dcon4.ttsebook.search.SearchResult
+import com.dcon4.ttsebook.debug.DebugLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,6 +37,7 @@ class SearchViewModel @Inject constructor(
             val entity = bookRepository.getBook(bookId) ?: return@launch
             val ebook = bookRepository.loadBook(entity.filePath) ?: return@launch
             chapters = ebook.chapters
+            DebugLogger.log("SearchViewModel", "Search book loaded: ${chapters.size} chapters")
         }
     }
 
@@ -47,8 +49,15 @@ class SearchViewModel @Inject constructor(
         }
         viewModelScope.launch {
             _isSearching.value = true
-            _results.value = searchEngine.search(query, chapters)
+            val found = searchEngine.search(query, chapters)
+            _results.value = found
             _isSearching.value = false
+            val first = found.firstOrNull()
+            DebugLogger.log(
+                "SearchViewModel",
+                "Query '$query' -> ${found.size} results" +
+                    (first?.let { ", first=${it.chapterTitle} ch${it.chapterIndex} p${it.paragraphIndex}" } ?: "")
+            )
         }
     }
 }
