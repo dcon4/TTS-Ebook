@@ -35,6 +35,13 @@ data class ChapterImageUi(
     val label: String
 )
 
+data class LinkSpanUi(
+    val start: Int,
+    val end: Int,
+    val href: String,
+    val targetChapterIndex: Int
+)
+
 @HiltViewModel
 class ReaderViewModel @Inject constructor(
     application: Application,
@@ -66,6 +73,9 @@ class ReaderViewModel @Inject constructor(
     private val _paragraphs = MutableStateFlow<List<String>>(emptyList())
     val paragraphs: StateFlow<List<String>> = _paragraphs.asStateFlow()
 
+    private val _paragraphLinks = MutableStateFlow<List<List<LinkSpanUi>>>(emptyList())
+    val paragraphLinks: StateFlow<List<List<LinkSpanUi>>> = _paragraphLinks.asStateFlow()
+
     private val _paragraphCount = MutableStateFlow(0)
     val paragraphCount: StateFlow<Int> = _paragraphCount.asStateFlow()
 
@@ -95,21 +105,60 @@ class ReaderViewModel @Inject constructor(
     var bookEntity: BookEntity? = null
         private set
 
-    private fun computeParagraphs(book: EbookBook?, chapterIndex: Int): List<String> {
-        val chapter = book?.chapters?.getOrNull(chapterIndex) ?: return emptyList()
-        return pronunciationRepository.applyTo(chapter.content)
-            .split(Regex("(?<=[.!?])\\s+"))
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
+    private fun sentenceStartOffsets(text: String): List<Int> {
+        val starts = mutableListOf(0)
+        for (m in Regex("(?<=[.!?])\\s+").findAll(text)) {
+            starts.add(m.range.last + 1)
+        }
+        return starts
+    }
+
+    private fun computeChapterTextAndLinks(book: EbookBook?, chapterIndex: Int): Pair<List<String>, List<List<LinkSpanUi>>> {
+        val chapter = book?.chapters?.getOrNull(chapterIndex) ?: return emptyList() to emptyList()
+        val text = pronunciationRepository.applyTo(chapter.content)
+        val starts = sentenceStartOffsets(text)
+        val sentences = mutableListOf<String>()
+        val ranges = mutableListOf<Pair<Int, Int>>()
+        starts.forEachIndexed { i, s ->
+            val e = if (i + 1 < starts.size) starts[i + 1] else text.length
+            val sentence = text.substring(s, e).trim()
+            if (sentence.isNotBlank()) {
+                sentences.add(sentence)
+                ranges.add(s to e)
+            }
+        }
+        val perSentence = MutableList(sentences.size) { mutableListOf<LinkSpanUi>() }
+        if (chapter.links.isNotEmpty() && ranges.isNotEmpty()) {
+            var cursor = 0
+            for (link in chapter.links) {
+                if (link.label.isEmpty() || link.start >= link.end) continue
+                val idx = text.indexOf(link.label, cursor)
+                if (idx < 0) continue
+                cursor = idx + link.label.length
+                val sentenceIndex = ranges.indexOfFirst { idx >= it.first && idx < it.second }
+                if (sentenceIndex < 0) continue
+                val sentenceStart = ranges[sentenceIndex].first
+                val sentenceLen = sentences[sentenceIndex].length
+                val relStart = (idx - sentenceStart).coerceIn(0, sentenceLen)
+                val relEnd = (relStart + link.label.length).coerceAtMost(sentenceLen)
+                if (relEnd > relStart) {
+                    perSentence[sentenceIndex].add(
+                        LinkSpanUi(relStart, relEnd, link.href, link.chapterIndex ?: -1)
+                    )
+                }
+            }
+        }
+        return sentences to perSentence
     }
 
     fun updateParagraphs() {
         val book = _currentBook.value
         val ci = _currentChapterIndex.value
         viewModelScope.launch(Dispatchers.Default) {
-            val list = computeParagraphs(book, ci)
+            val (list, links) = computeChapterTextAndLinks(book, ci)
             _paragraphs.value = list
             _paragraphCount.value = list.size
+            _paragraphLinks.value = links
         }
         handleChapterDisplay(ci)
     }
@@ -266,12 +315,13 @@ class ReaderViewModel @Inject constructor(
                     _currentParagraphIndex.value = pos?.paragraphIndex ?: 0
                 }
                 val list = withContext(Dispatchers.Default) {
-                    computeParagraphs(ebook, _currentChapterIndex.value)
+                    computeChapterTextAndLinks(ebook, _currentChapterIndex.value)
                 }
                 val t5 = System.currentTimeMillis()
-                DebugLogger.log(TAG, "loadBook: computeParagraphs ${t5-t4}ms size=${list.size}")
-                _paragraphs.value = list
-                _paragraphCount.value = list.size
+                DebugLogger.log(TAG, "loadBook: computeParagraphs ${t5-t4}ms size=${list.first.size}")
+                _paragraphs.value = list.first
+                _paragraphLinks.value = list.second
+                _paragraphCount.value = list.first.size
                 handleChapterDisplay(_currentChapterIndex.value)
                 val intent = Intent(getApplication(), TtsPlaybackService::class.java).apply {
                     action = TtsPlaybackService.ACTION_PLAY
@@ -348,6 +398,44 @@ class ReaderViewModel @Inject constructor(
         getApplication<Application>().startService(
             TtsPlaybackService.jumpToIntent(getApplication(), chapterIndex, paragraphIndex)
         )
+    }
+
+    fun tapToSpeak(paragraphIndex: Int) {
+        val total = _paragraphs.value.size
+        if (paragraphIndex < 0 || paragraphIndex >= total) return
+        val ci = _currentChapterIndex.value
+        DebugLogger.log(TAG, "Tap to speak: ch=$ci p=$paragraphIndex")
+        _currentParagraphIndex.value = paragraphIndex
+        val app = getApplication<Application>()
+        app.startService(TtsPlaybackService.playIntent(app))
+        app.startService(TtsPlaybackService.jumpToIntent(app, ci, paragraphIndex))
+    }
+
+    fun openLink(href: String, targetChapterIndex: Int) {
+        val app = getApplication<Application>()
+        if (targetChapterIndex >= 0) {
+            if (targetChapterIndex == _currentChapterIndex.value) {
+                DebugLogger.log(TAG, "Same-chapter link tapped (anchor, not yet supported): $href")
+            } else {
+                DebugLogger.log(TAG, "Internal link tapped: ch=$targetChapterIndex href=$href")
+                jumpTo(targetChapterIndex, 0)
+            }
+        } else {
+            DebugLogger.log(TAG, "External link tapped: $href")
+            val scheme = href.substringBefore(':').lowercase()
+            try {
+                if (scheme in setOf("http", "https", "mailto", "tel")) {
+                    val action = if (scheme == "mailto") Intent.ACTION_SENDTO else Intent.ACTION_VIEW
+                    val intent = Intent(action, android.net.Uri.parse(href))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    app.startActivity(intent)
+                } else {
+                    DebugLogger.log(TAG, "Unsupported link scheme: $scheme")
+                }
+            } catch (e: Exception) {
+                DebugLogger.logException(TAG, "Failed to open link", e)
+            }
+        }
     }
 
     fun addBookmark() {

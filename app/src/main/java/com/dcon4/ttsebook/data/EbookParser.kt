@@ -9,11 +9,20 @@ data class EbookImage(
     val href: String
 )
 
+data class ChapterLink(
+    val start: Int,
+    val end: Int,
+    val label: String,
+    val href: String,
+    val chapterIndex: Int? = null
+)
+
 data class EbookChapter(
     val index: Int,
     val title: String,
     val content: String,
     val images: List<EbookImage> = emptyList(),
+    val links: List<ChapterLink> = emptyList(),
     val pageNumber: Int? = null
 )
 

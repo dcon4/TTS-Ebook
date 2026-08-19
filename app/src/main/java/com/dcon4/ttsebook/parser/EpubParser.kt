@@ -48,15 +48,25 @@ class EpubParser : EbookParser {
             .filter { isHtmlType(it) }
             .filter { !it.nav || ncxItem == null }
         val chapterHrefs = htmlItems.map { resolveEntry(opfDir, it.href) }
+        val hrefToIndex = chapterHrefs.withIndex().associate { (i, href) -> href to i }
 
         val chapters = mutableListOf<EbookChapter>()
         var index = 0
         for (href in chapterHrefs) {
             val raw = readEntryText(zip, href) ?: continue
-            val images = extractImages(raw, href.substringBeforeLast('/', ""), hrefToType)
-            val content = stripHtml(raw)
+            val baseDir = href.substringBeforeLast('/', "")
+            val images = extractImages(raw, baseDir, hrefToType)
+            val (content, links) = stripHtmlWithLinks(raw, baseDir, hrefToIndex, index).let { (c, l) ->
+                val reference = stripHtml(raw)
+                if (c != reference) {
+                    DebugLogger.log("EpubParser", "link text extraction diverged from reference in $href; using reference without links")
+                    reference to emptyList()
+                } else {
+                    c to l
+                }
+            }
             if (content.isNotBlank()) {
-                chapters.add(EbookChapter(index, "Chapter ${index + 1}", content, images))
+                chapters.add(EbookChapter(index, "Chapter ${index + 1}", content, images, links))
                 index++
             }
         }
@@ -312,6 +322,121 @@ class EpubParser : EbookParser {
             .replace(Regex("&[a-zA-Z]+;"), " ")
             .replace(Regex("\\s+"), " ")
             .trim()
+    }
+
+    private fun isHtmlWs(c: Char): Boolean =
+        c == ' ' || c == '\t' || c == '\n' || c == '\u000B' || c == '\u000C' || c == '\r'
+
+    private fun hrefOf(tag: String): String? {
+        val m = Regex("""href\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))""", RegexOption.IGNORE_CASE)
+            .find(tag) ?: return null
+        return m.groupValues[2].ifEmpty { m.groupValues[3] }.ifEmpty { m.groupValues[4] }
+    }
+
+    private fun stripHtmlWithLinks(
+        html: String,
+        baseDir: String,
+        hrefToIndex: Map<String, Int>,
+        currentIndex: Int
+    ): Pair<String, List<ChapterLink>> {
+        val sb = StringBuilder()
+        val hrefStack = ArrayDeque<String>()
+        val startStack = ArrayDeque<Int>()
+        val links = mutableListOf<ChapterLink>()
+        val lower = html.lowercase()
+
+        var lastWasSpace = true
+        val emitWs = { if (!lastWasSpace) { sb.append(' '); lastWasSpace = true } }
+
+        var i = 0
+        while (i < html.length) {
+            if (html[i] == '<') {
+                val close = html.indexOf('>', i)
+                if (close == -1) {
+                    for (k in i until html.length) {
+                        val c = html[k]
+                        if (isHtmlWs(c)) emitWs() else { sb.append(c); lastWasSpace = false }
+                    }
+                    break
+                }
+                val tag = html.substring(i, close + 1)
+                val lowerTag = lower.substring(i, close + 1)
+                if (lowerTag.startsWith("<script") || lowerTag.startsWith("<style")) {
+                    val tagName = lowerTag.substring(1).substringBefore('>').substringBefore(' ')
+                    val closing = lower.indexOf("</$tagName", close + 1)
+                    val blockEnd = if (closing >= 0) lower.indexOf('>', closing) else -1
+                    i = if (blockEnd >= 0) blockEnd + 1 else close + 1
+                } else if (lowerTag.startsWith("</a") &&
+                    (lowerTag.length == 4 || isHtmlWs(lowerTag[3]))
+                ) {
+                    if (hrefStack.isNotEmpty()) {
+                        val href = hrefStack.removeLast()
+                        val start = startStack.removeLast()
+                        if (start < sb.length) {
+                            val label = sb.substring(start, sb.length)
+                            links.add(buildLink(start, sb.length, label, href, baseDir, hrefToIndex, currentIndex))
+                        }
+                    }
+                    i = close + 1
+                } else if (lowerTag.startsWith("<a") &&
+                    (lowerTag.length == 3 || isHtmlWs(lowerTag[2]))
+                ) {
+                    val href = hrefOf(tag)
+                    if (href != null) {
+                        if (hrefStack.isNotEmpty()) {
+                            hrefStack.removeLast()
+                            startStack.removeLast()
+                        }
+                        hrefStack.addLast(href)
+                        startStack.addLast(sb.length)
+                    }
+                    i = close + 1
+                } else {
+                    i = close + 1
+                }
+            } else if (html[i] == '&') {
+                if (html.startsWith("&nbsp;", i)) {
+                    emitWs(); i += 6
+                } else {
+                    val semicolon = html.indexOf(';', i)
+                    if (semicolon > i && semicolon - i <= 10 &&
+                        html.substring(i + 1, semicolon).isNotEmpty() &&
+                        html.substring(i + 1, semicolon).all { it in 'a'..'z' || it in 'A'..'Z' }
+                    ) {
+                        emitWs(); i = semicolon + 1
+                    } else {
+                        sb.append('&'); lastWasSpace = false; i++
+                    }
+                }
+            } else if (isHtmlWs(html[i])) {
+                emitWs(); i++
+            } else {
+                sb.append(html[i]); lastWasSpace = false; i++
+            }
+        }
+
+        if (sb.isNotEmpty() && sb.last() == ' ') {
+            sb.setLength(sb.length - 1)
+        }
+        return sb.toString() to links
+    }
+
+    private fun buildLink(
+        start: Int,
+        end: Int,
+        label: String,
+        href: String,
+        baseDir: String,
+        hrefToIndex: Map<String, Int>,
+        currentIndex: Int
+    ): ChapterLink {
+        val clean = href.substringBefore('#').trim()
+        val targetIndex: Int? = when {
+            clean.isBlank() || clean.startsWith("#") -> currentIndex
+            clean.contains("://") -> null
+            else -> hrefToIndex[resolveEntry(baseDir, clean)]
+        }
+        return ChapterLink(start, end, label, href, targetIndex)
     }
 
     private fun computeHash(chapters: List<EbookChapter>): String {

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -18,20 +19,31 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dcon4.ttsebook.BuildConfig
 import com.dcon4.ttsebook.debug.DebugLogger
 import com.dcon4.ttsebook.ui.viewmodel.ChapterImageUi
+import com.dcon4.ttsebook.ui.viewmodel.LinkSpanUi
 import com.dcon4.ttsebook.ui.viewmodel.ReaderViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 private sealed class ReaderItem {
-    data class Paragraph(val text: String, val sentenceIndex: Int) : ReaderItem()
+    data class Paragraph(
+        val text: String,
+        val sentenceIndex: Int,
+        val links: List<LinkSpanUi>
+    ) : ReaderItem()
     data class Picture(val image: ChapterImageUi) : ReaderItem()
 }
 
@@ -52,6 +64,7 @@ fun ReaderScreen(
     val currentParagraphIndex by viewModel.currentParagraphIndex.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
     val paragraphs by viewModel.paragraphs.collectAsState()
+    val paragraphLinks by viewModel.paragraphLinks.collectAsState()
     val paragraphCount by viewModel.paragraphCount.collectAsState()
     val chapters by viewModel.chapters.collectAsState()
     val bookFormat by viewModel.bookFormat.collectAsState()
@@ -64,13 +77,19 @@ fun ReaderScreen(
     var showDebugDialog by remember { mutableStateOf(false) }
     var showChapterDialog by remember { mutableStateOf(false) }
 
-    val items = remember(paragraphs, chapterImages) {
+    val items = remember(paragraphs, paragraphLinks, chapterImages) {
         val list = mutableListOf<ReaderItem>()
         paragraphs.forEachIndexed { index, text ->
             chapterImages.filter { it.anchorParagraphIndex == index }.forEach {
                 list.add(ReaderItem.Picture(it))
             }
-            list.add(ReaderItem.Paragraph(text, index))
+            list.add(
+                ReaderItem.Paragraph(
+                    text = text,
+                    sentenceIndex = index,
+                    links = paragraphLinks.getOrNull(index) ?: emptyList()
+                )
+            )
         }
         chapterImages.filter { it.anchorParagraphIndex >= paragraphs.size }.forEach {
             list.add(ReaderItem.Picture(it))
@@ -275,21 +294,52 @@ fun ReaderScreen(
                                     },
                                 contentScale = ContentScale.FillWidth
                             )
-                            is ReaderItem.Paragraph -> Surface(
+                            is ReaderItem.Paragraph -> {
+                            val linkStyles = TextLinkStyles(
+                                style = SpanStyle(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    textDecoration = TextDecoration.Underline
+                                )
+                            )
+                            val annotatedText = remember(item.text, item.links) {
+                                buildAnnotatedString {
+                                    append(item.text)
+                                    item.links.forEach { link ->
+                                        if (link.end > link.start && link.end <= item.text.length) {
+                                            addLink(
+                                                linkRange = TextRange(link.start, link.end),
+                                                linkAnnotation = LinkAnnotation.Clickable(
+                                                    tag = link.href,
+                                                    styles = linkStyles,
+                                                    linkInteractionListener = { _ ->
+                                                        viewModel.openLink(link.href, link.targetChapterIndex)
+                                                    }
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            Surface(
                                 color = if (item.sentenceIndex == currentParagraphIndex)
                                     MaterialTheme.colorScheme.primaryContainer
                                 else Color.Transparent,
                                 shape = MaterialTheme.shapes.small,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = { viewModel.tapToSpeak(item.sentenceIndex) }
                             ) {
-                                Text(
-                                    text = item.text,
-                                    modifier = Modifier.padding(12.dp),
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        lineHeight = 28.sp
+                                SelectionContainer {
+                                    Text(
+                                        text = annotatedText,
+                                        linkStyles = linkStyles,
+                                        modifier = Modifier.padding(12.dp),
+                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                            lineHeight = 28.sp
+                                        )
                                     )
-                                )
+                                }
                             }
+                        }
                         }
                     }
                 }
