@@ -1,5 +1,6 @@
 package com.dcon4.ttsebook.parser
 
+import com.dcon4.ttsebook.data.ChapterLink
 import com.dcon4.ttsebook.data.EbookBook
 import com.dcon4.ttsebook.data.EbookChapter
 import com.dcon4.ttsebook.data.EbookImage
@@ -56,13 +57,14 @@ class EpubParser : EbookParser {
             val raw = readEntryText(zip, href) ?: continue
             val baseDir = href.substringBeforeLast('/', "")
             val images = extractImages(raw, baseDir, hrefToType)
-            val (content, links) = stripHtmlWithLinks(raw, baseDir, hrefToIndex, index).let { (c, l) ->
+            val (content, links) = run {
+                val scanned = stripHtmlWithLinks(raw, baseDir, hrefToIndex, index)
                 val reference = stripHtml(raw)
-                if (c != reference) {
+                if (scanned.first != reference) {
                     DebugLogger.log("EpubParser", "link text extraction diverged from reference in $href; using reference without links")
-                    reference to emptyList()
+                    Pair(reference, emptyList<ChapterLink>())
                 } else {
-                    c to l
+                    scanned
                 }
             }
             if (content.isNotBlank()) {

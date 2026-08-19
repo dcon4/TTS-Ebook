@@ -22,7 +22,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -307,14 +306,15 @@ fun ReaderScreen(
                                     item.links.forEach { link ->
                                         if (link.end > link.start && link.end <= item.text.length) {
                                             addLink(
-                                                linkRange = TextRange(link.start, link.end),
-                                                linkAnnotation = LinkAnnotation.Clickable(
+                                                LinkAnnotation.Clickable(
                                                     tag = link.href,
                                                     styles = linkStyles,
                                                     linkInteractionListener = { _ ->
                                                         viewModel.openLink(link.href, link.targetChapterIndex)
                                                     }
-                                                )
+                                                ),
+                                                link.start,
+                                                link.end
                                             )
                                         }
                                     }
@@ -331,7 +331,6 @@ fun ReaderScreen(
                                 SelectionContainer {
                                     Text(
                                         text = annotatedText,
-                                        linkStyles = linkStyles,
                                         modifier = Modifier.padding(12.dp),
                                         style = MaterialTheme.typography.bodyLarge.copy(
                                             lineHeight = 28.sp
