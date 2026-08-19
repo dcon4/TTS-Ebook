@@ -114,7 +114,8 @@ class ReaderViewModel @Inject constructor(
     }
 
     private fun computeChapterTextAndLinks(book: EbookBook?, chapterIndex: Int): Pair<List<String>, List<List<LinkSpanUi>>> {
-        val chapter = book?.chapters?.getOrNull(chapterIndex) ?: return emptyList() to emptyList()
+        val chapter = book?.chapters?.getOrNull(chapterIndex)
+        if (chapter == null) return emptyList<String>() to emptyList<List<LinkSpanUi>>()
         val text = pronunciationRepository.applyTo(chapter.content)
         val starts = sentenceStartOffsets(text)
         val sentences = mutableListOf<String>()
