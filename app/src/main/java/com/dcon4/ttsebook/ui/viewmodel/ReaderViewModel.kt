@@ -289,6 +289,12 @@ class ReaderViewModel @Inject constructor(
                 } else {
                     getApplication<Application>().startService(intent)
                 }
+                if (initialChapterIndex >= 0 && initialParagraphIndex >= 0) {
+                    DebugLogger.log(TAG, "loadBook: jump to ch=$initialChapterIndex p=$initialParagraphIndex")
+                    getApplication<Application>().startService(
+                        TtsPlaybackService.jumpToIntent(getApplication(), initialChapterIndex, initialParagraphIndex)
+                    )
+                }
             } catch (e: Throwable) {
                 DebugLogger.logException(TAG, "loadBook failed", e)
             }
