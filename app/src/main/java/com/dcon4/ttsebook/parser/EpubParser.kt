@@ -170,14 +170,19 @@ class EpubParser : EbookParser {
         if (navPoints.isEmpty()) return
 
         val hrefToIndex = chapterHrefs.withIndex().associate { it.value to it.index }
+        // Also build a root-relative map (without opfDir prefix) for NCX src values that resolve to root
+        val rootHrefs = chapterHrefs.associate { href -> href.substringAfter('/') to href }
         for ((label, src) in navPoints) {
             if (label.isBlank() || src.isBlank()) continue
             val candidates = listOf(
                 resolveEntry(ncxDir, src),
                 resolveEntry(opfDir, src),
-                src.removePrefix("/")
+                src.removePrefix("/"),
             ).distinct()
-            val idx = candidates.firstNotNullOfOrNull { hrefToIndex[it] } ?: continue
+            val idx = candidates.firstNotNullOfOrNull { hrefToIndex[it] }
+                ?: candidates.firstNotNullOfOrNull { rootHrefs[it] }
+                    ?.let { hrefToIndex[it] }
+                ?: continue
             if (idx in chapters.indices && chapters[idx].title.startsWith("Chapter ")) {
                 chapters[idx] = chapters[idx].copy(title = label)
             }
