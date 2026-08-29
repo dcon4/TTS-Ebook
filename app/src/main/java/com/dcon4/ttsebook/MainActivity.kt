@@ -25,6 +25,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.dcon4.ttsebook.debug.DebugLogger
+import com.dcon4.ttsebook.ui.screen.ImageZoomScreen
 import com.dcon4.ttsebook.ui.screen.LibraryScreen
 import com.dcon4.ttsebook.ui.screen.PronunciationScreen
 import com.dcon4.ttsebook.ui.screen.ReaderScreen
@@ -144,6 +145,9 @@ fun TtsEbookNavHost(
                 onNavigateToSettings = {
                     navController.navigate("settings")
                 },
+                onNavigateToZoomImage = {
+                    navController.navigate("imagezoom")
+                },
                 onBack = { navController.popBackStack() }
             )
         }
@@ -187,6 +191,9 @@ fun TtsEbookNavHost(
                 onNavigateToSettings = {
                     navController.navigate("settings")
                 },
+                onNavigateToZoomImage = {
+                    navController.navigate("imagezoom")
+                },
                 onBack = { navController.popBackStack() }
             )
         }
@@ -202,6 +209,12 @@ fun TtsEbookNavHost(
 
         composable("pronunciations") {
             PronunciationScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable("imagezoom") {
+            ImageZoomScreen(
+                onBack = { navController.popBackStack() }
+            )
         }
     }
 }

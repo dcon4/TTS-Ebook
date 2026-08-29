@@ -2,6 +2,7 @@ package com.dcon4.ttsebook.ui.screen
 
 import android.content.Intent
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -33,6 +34,7 @@ import com.dcon4.ttsebook.debug.DebugLogger
 import com.dcon4.ttsebook.ui.viewmodel.ChapterImageUi
 import com.dcon4.ttsebook.ui.viewmodel.LinkSpanUi
 import com.dcon4.ttsebook.ui.viewmodel.ReaderViewModel
+import com.dcon4.ttsebook.ui.viewmodel.ZoomImageHolder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -55,6 +57,7 @@ fun ReaderScreen(
     onNavigateToSearch: () -> Unit,
     onNavigateToBookmarks: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToZoomImage: () -> Unit,
     onBack: () -> Unit,
     viewModel: ReaderViewModel = hiltViewModel()
 ) {
@@ -287,6 +290,10 @@ fun ReaderScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 8.dp)
+                                    .clickable {
+                                        ZoomImageHolder.set(item.image.bitmap)
+                                        onNavigateToZoomImage()
+                                    }
                                     .semantics {
                                         contentDescription =
                                             "Picture: ${item.image.label.ifBlank { "unnamed" }}"
