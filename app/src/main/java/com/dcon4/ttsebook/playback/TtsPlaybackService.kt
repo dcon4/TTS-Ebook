@@ -105,7 +105,7 @@ class TtsPlaybackService : Service() {
 
     private val volumeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == AudioManager.VOLUME_CHANGED_ACTION && pauseOnVolumeZero) {
+            if (intent?.action == "android.media.VOLUME_CHANGED_ACTION" && pauseOnVolumeZero) {
                 val am = getSystemService(AUDIO_SERVICE) as AudioManager
                 val current = am.getStreamVolume(AudioManager.STREAM_MUSIC)
                 if (current == 0 && isPlaying) {
@@ -634,7 +634,7 @@ class TtsPlaybackService : Service() {
             .getBoolean("pause_on_volume_zero", true)
         pauseOnVolumeZero = enabled
         if (enabled && !volumeReceiverRegistered) {
-            val filter = IntentFilter(AudioManager.VOLUME_CHANGED_ACTION)
+            val filter = IntentFilter("android.media.VOLUME_CHANGED_ACTION")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 registerReceiver(volumeReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
             } else {
