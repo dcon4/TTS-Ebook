@@ -28,7 +28,16 @@ class BooleanSearchEngine {
                     val relevance = computeRelevance(query, paragraph)
                     val pStart = content.indexOf(paragraph)
                     val sentenceIndex = if (pStart >= 0) {
-                        sentenceBounds.indexOfFirst { pStart < it.second }.coerceAtLeast(0)
+                        val lowerPara = paragraph.lowercase()
+                        val matchOffset = tokens.firstNotNullOfOrNull { token ->
+                            when (token.type) {
+                                TokenType.WORD, TokenType.PHRASE -> lowerPara.indexOf(token.value).takeIf { it >= 0 }
+                                else -> null
+                            }
+                        } ?: 0
+                        val absPos = pStart + matchOffset
+                        sentenceBounds.indexOfFirst { absPos >= it.first && absPos < it.second }
+                            .coerceAtLeast(0)
                     } else {
                         0
                     }
