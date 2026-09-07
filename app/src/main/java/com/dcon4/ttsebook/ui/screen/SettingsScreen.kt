@@ -34,6 +34,7 @@ fun SettingsScreen(
     val mediaSessionEnabled by viewModel.mediaSessionEnabled.collectAsState()
     val showPdfPages by viewModel.showPdfPages.collectAsState()
     val showEmbeddedImages by viewModel.showEmbeddedImages.collectAsState()
+    val pauseOnVolumeZero by viewModel.pauseOnVolumeZero.collectAsState()
 
     var showDebugDialog by remember { mutableStateOf(false) }
     var showEngineDialog by remember { mutableStateOf(false) }
@@ -164,6 +165,34 @@ fun SettingsScreen(
                             onCheckedChange = { viewModel.toggleMediaSessionEnabled() },
                             modifier = Modifier.semantics {
                                 contentDescription = "Toggle Bluetooth media controls"
+                            }
+                        )
+                    }
+                }
+            }
+
+            item {
+                OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Pause when volume is zero", style = MaterialTheme.typography.labelLarge)
+                            Text(
+                                text = if (pauseOnVolumeZero) "Enabled" else "Disabled",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = pauseOnVolumeZero,
+                            onCheckedChange = { viewModel.togglePauseOnVolumeZero() },
+                            modifier = Modifier.semantics {
+                                contentDescription = "Toggle pause when volume is zero"
                             }
                         )
                     }

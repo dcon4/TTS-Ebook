@@ -10,8 +10,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
@@ -98,6 +100,21 @@ class TtsPlaybackService : Service() {
     private var hasPendingChunks = false
     private var ttsInitPending = false
     private var pendingJump: Pair<Int, Int>? = null
+    private var pauseOnVolumeZero = true
+    private var volumeReceiverRegistered = false
+
+    private val volumeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == AudioManager.VOLUME_CHANGED_ACTION && pauseOnVolumeZero) {
+                val am = getSystemService(AUDIO_SERVICE) as AudioManager
+                val current = am.getStreamVolume(AudioManager.STREAM_MUSIC)
+                if (current == 0 && isPlaying) {
+                    DebugLogger.log(TAG, "Volume reached zero, pausing TTS")
+                    pause()
+                }
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -109,6 +126,7 @@ class TtsPlaybackService : Service() {
             setCallback(MediaSessionCallback())
         }
         applyMediaSessionConfig()
+        readVolumeZeroSetting()
         ttsManager.onUtteranceDone = { utteranceId ->
             handleUtteranceDone(utteranceId)
         }
@@ -181,6 +199,7 @@ class TtsPlaybackService : Service() {
             }
             ACTION_UPDATE_SETTINGS -> {
                 applyMediaSessionConfig()
+                readVolumeZeroSetting()
                 if (mediaSession.isActive) updateMediaSession()
             }
             ACTION_BOOKMARK -> addBookmark()
@@ -198,6 +217,10 @@ class TtsPlaybackService : Service() {
 
     override fun onDestroy() {
         DebugLogger.log(TAG, "Service onDestroy")
+        if (volumeReceiverRegistered) {
+            try { unregisterReceiver(volumeReceiver) } catch (_: Exception) {}
+            volumeReceiverRegistered = false
+        }
         ttsManager.stop()
         mediaSession.isActive = false
         mediaSession.release()
@@ -603,6 +626,26 @@ class TtsPlaybackService : Service() {
         } else {
             mediaSession.isActive = false
             mediaSession.setFlags(0)
+        }
+    }
+
+    private fun readVolumeZeroSetting() {
+        val enabled = getSharedPreferences("ttsebook_settings", Context.MODE_PRIVATE)
+            .getBoolean("pause_on_volume_zero", true)
+        pauseOnVolumeZero = enabled
+        if (enabled && !volumeReceiverRegistered) {
+            val filter = IntentFilter(AudioManager.VOLUME_CHANGED_ACTION)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(volumeReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                registerReceiver(volumeReceiver, filter)
+            }
+            volumeReceiverRegistered = true
+            DebugLogger.log(TAG, "Volume zero receiver registered")
+        } else if (!enabled && volumeReceiverRegistered) {
+            try { unregisterReceiver(volumeReceiver) } catch (_: Exception) {}
+            volumeReceiverRegistered = false
+            DebugLogger.log(TAG, "Volume zero receiver unregistered")
         }
     }
 

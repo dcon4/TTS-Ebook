@@ -33,6 +33,7 @@ class SettingsViewModel @Inject constructor(
         private const val KEY_MEDIA_SESSION_ENABLED = "media_session_enabled"
         private const val KEY_SHOW_PDF_PAGES = "show_pdf_pages"
         private const val KEY_SHOW_EMBEDDED_IMAGES = "show_embedded_images"
+        private const val KEY_PAUSE_ON_VOLUME_ZERO = "pause_on_volume_zero"
     }
 
     private val prefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -71,6 +72,11 @@ class SettingsViewModel @Inject constructor(
         prefs.getBoolean(KEY_SHOW_EMBEDDED_IMAGES, true)
     )
     val showEmbeddedImages: StateFlow<Boolean> = _showEmbeddedImages.asStateFlow()
+
+    private val _pauseOnVolumeZero = MutableStateFlow(
+        prefs.getBoolean(KEY_PAUSE_ON_VOLUME_ZERO, true)
+    )
+    val pauseOnVolumeZero: StateFlow<Boolean> = _pauseOnVolumeZero.asStateFlow()
 
     init {
         loadTtsSettings()
@@ -143,6 +149,18 @@ class SettingsViewModel @Inject constructor(
         _showEmbeddedImages.value = newValue
         prefs.edit().putBoolean(KEY_SHOW_EMBEDDED_IMAGES, newValue).apply()
         DebugLogger.verbose("SettingsViewModel", "Show embedded images toggled to $newValue")
+    }
+
+    fun togglePauseOnVolumeZero() {
+        val newValue = !_pauseOnVolumeZero.value
+        _pauseOnVolumeZero.value = newValue
+        prefs.edit().putBoolean(KEY_PAUSE_ON_VOLUME_ZERO, newValue).apply()
+        val intent = android.content.Intent(
+            getApplication(),
+            com.dcon4.ttsebook.playback.TtsPlaybackService::class.java
+        ).setAction(com.dcon4.ttsebook.playback.TtsPlaybackService.ACTION_UPDATE_SETTINGS)
+        getApplication<android.app.Application>().startService(intent)
+        DebugLogger.verbose("SettingsViewModel", "Pause on volume zero toggled to $newValue")
     }
 
     fun getShareLogIntent(): Intent? {
