@@ -48,6 +48,7 @@ class TtsPlaybackService : Service() {
         const val ACTION_JUMP_TO = "com.dcon4.ttsebook.action.JUMP_TO"
         const val ACTION_UPDATE_SETTINGS = "com.dcon4.ttsebook.action.UPDATE_SETTINGS"
         const val ACTION_BOOKMARK = "com.dcon4.ttsebook.action.BOOKMARK"
+        const val ACTION_RELEASE = "com.dcon4.ttsebook.action.RELEASE"
         const val ACTION_STOP = "com.dcon4.ttsebook.action.STOP"
         const val ACTION_POSITION_CHANGED = "com.dcon4.ttsebook.action.POSITION_CHANGED"
         const val EXTRA_CHAPTER_INDEX = "chapterIndex"
@@ -68,6 +69,7 @@ class TtsPlaybackService : Service() {
                 .putExtra(EXTRA_CHAPTER_INDEX, chapterIndex)
                 .putExtra(EXTRA_PARAGRAPH_INDEX, paragraphIndex)
         fun bookmarkIntent(context: Context): Intent = Intent(context, TtsPlaybackService::class.java).setAction(ACTION_BOOKMARK)
+        fun releaseIntent(context: Context): Intent = Intent(context, TtsPlaybackService::class.java).setAction(ACTION_RELEASE)
         fun stopIntent(context: Context): Intent = Intent(context, TtsPlaybackService::class.java).setAction(ACTION_STOP)
     }
 
@@ -203,6 +205,7 @@ class TtsPlaybackService : Service() {
                 if (mediaSession.isActive) updateMediaSession()
             }
             ACTION_BOOKMARK -> addBookmark()
+            ACTION_RELEASE -> { ttsManager.stop(); stopSelf() }
             ACTION_STOP -> stopSelf()
             else -> {
                 if (intent?.action == Intent.ACTION_MEDIA_BUTTON) {
@@ -537,8 +540,8 @@ class TtsPlaybackService : Service() {
             this, 4, nextChapterIntent(this),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val bookmarkPending = PendingIntent.getService(
-            this, 5, bookmarkIntent(this),
+        val releasePending = PendingIntent.getService(
+            this, 6, releaseIntent(this),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -566,7 +569,7 @@ class TtsPlaybackService : Service() {
             .addAction(playPauseIcon, if (isPlaying) "Pause" else "Play", playPausePending)
             .addAction(android.R.drawable.ic_media_next, "Next", nextParaIntent)
             .addAction(android.R.drawable.ic_media_next, "Next Chap", nextChapterPending)
-            .addAction(android.R.drawable.ic_menu_add, "Bookmark", bookmarkPending)
+            .addAction(android.R.drawable.ic_media_stop, "Release", releasePending)
             .build()
 
         try {
