@@ -569,7 +569,7 @@ class TtsPlaybackService : Service() {
             .addAction(playPauseIcon, if (isPlaying) "Pause" else "Play", playPausePending)
             .addAction(android.R.drawable.ic_media_next, "Next", nextParaIntent)
             .addAction(android.R.drawable.ic_media_next, "Next Chap", nextChapterPending)
-            .addAction(android.R.drawable.ic_media_stop, "Release", releasePending)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Release", releasePending)
             .build()
 
         try {
